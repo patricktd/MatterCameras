@@ -8,6 +8,7 @@ import { appConfig } from '../config/app.js';
 import { Camera } from '../types/index.js';
 import { Go2RTCClient } from '../streaming/Go2RTCClient.js';
 import { streamContext } from './behaviors/streamContext.js';
+import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
 import { BridgedCameraDevice, bridgedCameraOptions } from './devices/BridgedCameraDevice.js';
 
 /** Matter Aggregator (bridge) device type — must match mDNS commissioning advert. */
@@ -118,6 +119,19 @@ export class MatterBridge {
 
     isCommissioned() {
         return this.server?.state.commissioning.commissioned ?? false;
+    }
+
+    async updateCamera(camera: Camera) {
+        const endpoint = this.cameraEndpoints.get(camera.id);
+        if (!endpoint) {
+            console.warn(`Camera ${camera.id} not found on bridge`);
+            return;
+        }
+
+        console.log(`Updating bridged camera: ${camera.name} (${camera.id})`);
+        await endpoint.setStateOf(BridgedDeviceBasicInformationServer, {
+            nodeLabel: camera.name,
+        });
     }
 
     async removeCamera(id: string) {

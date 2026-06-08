@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ./data/go2rtc.yaml:/config/go2rtc.yaml:ro
+      - ./data/go2rtc.yaml:/config/go2rtc.yaml
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3203/api"]
       interval: 30s

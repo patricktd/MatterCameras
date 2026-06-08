@@ -116,15 +116,21 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
 
         logger.info(`CaptureSnapshot camera=${cameraId} ${width}x${height}`);
 
-        let jpeg = await go2rtc.captureFrame(cameraId, width, height);
-        while (jpeg.byteLength > MAX_SNAPSHOT_BYTES && width > 320 && height > 240) {
-            width = Math.round(width * 0.75);
-            height = Math.round(height * 0.75);
-            logger.info(`CaptureSnapshot retry smaller ${width}x${height} (was ${jpeg.byteLength} bytes)`);
+        let jpeg: Uint8Array;
+        try {
             jpeg = await go2rtc.captureFrame(cameraId, width, height);
+            while (jpeg.byteLength > MAX_SNAPSHOT_BYTES && width > 320 && height > 240) {
+                width = Math.round(width * 0.75);
+                height = Math.round(height * 0.75);
+                logger.info(`CaptureSnapshot retry smaller ${width}x${height} (was ${jpeg.byteLength} bytes)`);
+                jpeg = await go2rtc.captureFrame(cameraId, width, height);
+            }
+        } catch (error) {
+            logger.error(`CaptureSnapshot failed camera=${cameraId}: ${error}`);
+            throw error;
         }
 
-        logger.info(`CaptureSnapshot done ${jpeg.byteLength} bytes`);
+        logger.info(`CaptureSnapshot done camera=${cameraId} ${jpeg.byteLength} bytes`);
 
         return new AvMgmt.CaptureSnapshotResponse({
             data: jpeg,

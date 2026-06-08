@@ -58,7 +58,13 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
             + `sdp=${request.sdp.length}ch iceServers=${iceServers?.length ?? 0}`,
         );
 
-        const exchange = await go2rtc.exchangeWebRtcOffer(cameraId, request.sdp, iceServers);
+        let exchange;
+        try {
+            exchange = await go2rtc.exchangeWebRtcOffer(cameraId, request.sdp, iceServers);
+        } catch (error) {
+            logger.error(`ProvideOffer failed camera=${cameraId} session=${sessionId}: ${error}`);
+            throw error;
+        }
         logger.info(`go2rtc answer session=${sessionId} sdp=${exchange.answerSdp.length}ch`);
 
         if (exchange.whepLocation && exchange.whepEtag) {
@@ -115,7 +121,8 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         }
 
         try {
-            this.state.currentSessions = [...(this.state.currentSessions ?? []), new WebRtcTransportDefinitions.WebRtcSession(sessionFields)];
+            const others = (this.state.currentSessions ?? []).filter(s => s.id !== sessionId);
+            this.state.currentSessions = [...others, new WebRtcTransportDefinitions.WebRtcSession(sessionFields)];
         } catch (error) {
             logger.warn(`Failed to update currentSessions: ${error}`);
         }
@@ -152,10 +159,18 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
     }
 
     override async endSession(request: WebRtcTransportProvider.EndSessionRequest) {
+        const session = this.#sessions.get(request.webRtcSessionId);
+        const go2rtc = streamContext.go2rtc;
+
+        if (go2rtc && session?.whepLocation) {
+            await go2rtc.closeWebRtcSession(session.whepLocation);
+        }
+
         this.#sessions.delete(request.webRtcSessionId);
         this.state.currentSessions = (this.state.currentSessions ?? []).filter(
             s => s.id !== request.webRtcSessionId,
         );
+        logger.info(`endSession camera=${session?.cameraId ?? '?'} session=${request.webRtcSessionId}`);
     }
 
     #hubEndpoint(originatingEndpointId: EndpointNumber | null | undefined): EndpointNumber {

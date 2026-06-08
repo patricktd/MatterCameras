@@ -42,6 +42,38 @@ app.post('/api/cameras', async (req, res) => {
     res.redirect('/');
 });
 
+app.post('/api/cameras/:id', async (req, res) => {
+    const { id } = req.params;
+    const existing = storage.getCamera(id);
+    if (!existing) {
+        res.status(404).send('Camera not found');
+        return;
+    }
+
+    const updated = await storage.updateCamera(id, {
+        name: req.body.name,
+        rtspUrl: req.body.rtspUrl,
+        codec: req.body.codec,
+    });
+
+    if (!updated) {
+        res.status(404).send('Camera not found');
+        return;
+    }
+
+    await bridge.updateCamera(updated);
+
+    const rtspChanged = updated.rtspUrl !== existing.rtspUrl;
+    if (rtspChanged) {
+        await bridge.go2rtc.removeStream(id);
+        await bridge.go2rtc.addStream(updated.id, updated.name, updated.rtspUrl);
+    } else if (updated.name !== existing.name) {
+        await bridge.go2rtc.addStream(updated.id, updated.name, updated.rtspUrl);
+    }
+
+    res.redirect('/');
+});
+
 app.post('/api/cameras/:id/delete', async (req, res) => {
     const { id } = req.params;
     await storage.removeCamera(id);

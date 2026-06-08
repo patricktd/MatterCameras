@@ -25,6 +25,10 @@ export function bridgedCameraOptions(camera: Camera) {
             productName: 'RTSP Camera',
             serialNumber: camera.id,
             uniqueId: `${camera.id}-uid`,
+            hardwareVersion: 1,
+            hardwareVersionString: '1.0',
+            softwareVersion: 1,
+            softwareVersionString: '1.0.0',
         },
         cameraAvStreamManagement: cameraAvStreamDefaults(),
     };

@@ -48,6 +48,21 @@ export class StorageService {
     getCamera(id: string): Camera | undefined {
         return this.db.data.cameras.find(c => c.id === id);
     }
+
+    async updateCamera(id: string, updates: Partial<Omit<Camera, 'id'>>): Promise<Camera | undefined> {
+        const camera = this.db.data.cameras.find(c => c.id === id);
+        if (!camera) return undefined;
+
+        if (updates.name !== undefined) camera.name = updates.name;
+        if (updates.rtspUrl !== undefined) camera.rtspUrl = updates.rtspUrl;
+        if (updates.codec !== undefined) camera.codec = updates.codec || undefined;
+        if (updates.onvifUrl !== undefined) camera.onvifUrl = updates.onvifUrl;
+        if (updates.username !== undefined) camera.username = updates.username;
+        if (updates.password !== undefined) camera.password = updates.password;
+
+        await this.db.write();
+        return camera;
+    }
 }
 
 export const storage = new StorageService();

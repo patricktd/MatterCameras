@@ -25,19 +25,47 @@
 
             <div class="camera-list">
                 <% cameras.forEach(cam=> { %>
-                    <div class="camera-card">
-                        <h3>
-                            <%= cam.name %>
-                        </h3>
-                        <p style="color: var(--text-secondary); font-size: 0.8rem; word-break: break-all;">
-                            <%= cam.rtspUrl %>
-                        </p>
-                        <div style="margin-top: 15px;">
-                            <form action="/api/cameras/<%= cam.id %>/delete" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-danger"
-                                    style="padding: 5px 10px; font-size: 0.8rem;">Remove</button>
-                            </form>
+                    <div class="camera-card" data-camera-id="<%= cam.id %>">
+                        <div class="camera-view">
+                            <h3>
+                                <%= cam.name %>
+                            </h3>
+                            <p style="color: var(--text-secondary); font-size: 0.8rem; word-break: break-all;">
+                                <%= cam.rtspUrl %>
+                            </p>
+                            <% if (cam.codec) { %>
+                                <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 8px;">
+                                    Codec: <%= cam.codec.toUpperCase() %>
+                                </p>
+                            <% } %>
+                            <div class="camera-actions">
+                                <button type="button" class="btn btn-secondary btn-sm btn-edit">Edit</button>
+                                <form action="/api/cameras/<%= cam.id %>/delete" method="POST" style="display:inline;"
+                                    onsubmit="return confirm('Remove camera <%= cam.name %>?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                </form>
+                            </div>
                         </div>
+
+                        <form class="camera-edit hidden" action="/api/cameras/<%= cam.id %>" method="POST">
+                            <label>Camera Name</label>
+                            <input type="text" name="name" value="<%= cam.name %>" required>
+
+                            <label>RTSP / ONVIF Stream URL</label>
+                            <input type="text" name="rtspUrl" value="<%= cam.rtspUrl %>" required>
+
+                            <label>Video Codec (Optional)</label>
+                            <select name="codec">
+                                <option value="" <%= !cam.codec ? 'selected' : '' %>>Auto Detect</option>
+                                <option value="h264" <%= cam.codec === 'h264' ? 'selected' : '' %>>H.264</option>
+                                <option value="h265" <%= cam.codec === 'h265' ? 'selected' : '' %>>H.265</option>
+                            </select>
+
+                            <div class="camera-actions">
+                                <button type="submit" class="btn btn-sm">Save</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-cancel">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                     <% }) %>
             </div>
@@ -95,6 +123,21 @@
     </div>
 
     <script>
+        document.querySelectorAll('.camera-card').forEach(card => {
+            const view = card.querySelector('.camera-view');
+            const edit = card.querySelector('.camera-edit');
+
+            card.querySelector('.btn-edit')?.addEventListener('click', () => {
+                view.classList.add('hidden');
+                edit.classList.remove('hidden');
+            });
+
+            card.querySelector('.btn-cancel')?.addEventListener('click', () => {
+                edit.classList.add('hidden');
+                view.classList.remove('hidden');
+            });
+        });
+
         const logContainer = document.getElementById('log-container');
         let isScrolledToBottom = true;
 

@@ -19,11 +19,14 @@ interface StreamSource {
     rtspUrl: string;
 }
 
+const DEFAULT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
+
 export class Go2RTCClient {
     private baseUrl: string;
     private sources = new Map<string, StreamSource>();
     /** Serialize ffmpeg-heavy ops per camera to avoid starving the other stream. */
     private readonly locks = new Map<string, Promise<void>>();
+    private pruneTimer?: ReturnType<typeof setInterval>;
 
     constructor(baseUrl: string = 'http://127.0.0.1:3203') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -58,11 +61,46 @@ export class Go2RTCClient {
         return `${this.sanitizeName(id)}_webrtc`;
     }
 
-    /** Re-register all known camera streams in go2rtc. */
+    /** Re-register all known camera streams in go2rtc and drop stale entries. */
     async syncAllStreams(): Promise<void> {
         for (const [id, source] of this.sources) {
             await this.addStream(id, source.name, source.rtspUrl);
         }
+        await this.pruneOrphanStreams();
+    }
+
+    /** Remove go2rtc streams that are not registered cameras (e.g. after camera delete). */
+    async pruneOrphanStreams(): Promise<string[]> {
+        const allowed = this.#expectedStreamNames();
+        const present = await this.#listGo2rtcStreamNames();
+        const orphans = present.filter(name => !allowed.has(name));
+
+        for (const name of orphans) {
+            if (await this.#deleteStreamByName(name)) {
+                logger.info(`Removed orphan go2rtc stream: ${name}`);
+            } else {
+                logger.warn(`Could not remove orphan go2rtc stream: ${name}`);
+            }
+        }
+
+        if (orphans.length > 0) {
+            logger.info(`Pruned ${orphans.length} orphan go2rtc stream(s)`);
+        }
+
+        return orphans;
+    }
+
+    /** Periodically drop streams that no longer match cameras.json. */
+    startPeriodicPrune(intervalMs = DEFAULT_PRUNE_INTERVAL_MS): void {
+        if (this.pruneTimer) return;
+
+        this.pruneTimer = setInterval(() => {
+            this.pruneOrphanStreams().catch(error => {
+                logger.warn(`Periodic go2rtc prune failed: ${error}`);
+            });
+        }, intervalMs);
+
+        logger.info(`go2rtc orphan prune scheduled every ${Math.round(intervalMs / 1000)}s`);
     }
 
     /**
@@ -160,23 +198,14 @@ export class Go2RTCClient {
     }
 
     async removeStream(id: string): Promise<void> {
-        const streamName = this.sanitizeName(id);
         this.unregisterSource(id);
-        const params = new URLSearchParams({ name: streamName });
+        const names = [this.sanitizeName(id), this.webrtcStreamName(id)];
 
-        try {
-            const response = await fetch(`${this.baseUrl}/api/streams?${params.toString()}`, {
-                method: 'DELETE',
-            });
-
-            if (!response.ok) {
-                logger.error(`Failed to remove stream ${streamName}: ${response.status} ${response.statusText}`);
-            } else {
-                logger.info(`Stream ${streamName} removed from go2rtc`);
-            }
-        } catch (error) {
-            logger.error('Error connecting to go2rtc:', error);
+        for (const name of names) {
+            await this.#deleteStreamByName(name);
         }
+
+        await this.pruneOrphanStreams();
     }
 
     /** Fetch a JPEG snapshot from go2rtc (RTSP frame grab). */
@@ -208,7 +237,7 @@ export class Go2RTCClient {
     }
 
     /**
-     * Exchange SDP offer with go2rtc (WHEP/JSON). Passes hub TURN/STUN when provided.
+     * Exchange SDP offer with go2rtc. Hub TURN/STUN uses JSON API (go2rtc WHEP often omits Location).
      */
     async exchangeWebRtcOffer(
         streamId: string,
@@ -216,62 +245,70 @@ export class Go2RTCClient {
         iceServers?: Go2RtcIceServer[],
         retried = false,
     ): Promise<WebRtcExchangeResult> {
-        await this.ensureStream(streamId);
-
-        const streamName = this.webrtcStreamName(streamId);
-        const url = `${this.baseUrl}/api/webrtc?src=${encodeURIComponent(streamName)}`;
-
-        // WHEP (application/sdp) gives Location/ETag for ICE trickle; pass TURN via Link headers.
-        const whepHeaders: Record<string, string> = {
-            'Content-Type': 'application/sdp',
-            Accept: 'application/sdp',
-            ...this.#iceServerLinkHeaders(iceServers),
-        };
-
-        let response = await fetch(url, { method: 'POST', headers: whepHeaders, body: offerSdp });
-
-        if (!response.ok && iceServers?.length) {
-            response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify({ type: 'offer', sdp: offerSdp, ice_servers: iceServers }),
-            });
-        }
-
-        if (response.status === 404 && !retried) {
+        return this.#withLock(streamId, async () => {
             await this.ensureStream(streamId);
-            return this.exchangeWebRtcOffer(streamId, offerSdp, iceServers, true);
-        }
 
-        if (!response.ok) {
-            const body = await response.text().catch(() => '');
-            throw new Error(`go2rtc WebRTC failed (${response.status}): ${body || response.statusText}`);
-        }
+            const streamName = this.webrtcStreamName(streamId);
+            const url = `${this.baseUrl}/api/webrtc?src=${encodeURIComponent(streamName)}`;
+            const source = this.sources.get(streamId);
 
-        const whepLocation = response.headers.get('location') ?? undefined;
-        const whepEtag = response.headers.get('etag') ?? undefined;
-        const answerSdp = await this.#parseAnswerSdp(response);
+            let response: Response;
+            let mode: 'json' | 'whep';
 
-        logger.info(
-            `go2rtc WebRTC answer sdp=${answerSdp.length}ch iceServers=${iceServers?.length ?? 0} whep=${whepLocation ? 'yes' : 'no'}`,
-        );
+            if (iceServers?.length) {
+                mode = 'json';
+                response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ type: 'offer', sdp: offerSdp, ice_servers: iceServers }),
+                });
+            } else {
+                mode = 'whep';
+                response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/sdp', Accept: 'application/sdp' },
+                    body: offerSdp,
+                });
+            }
 
-        return { answerSdp, whepLocation, whepEtag };
+            if (response.status === 404 && !retried) {
+                await this.ensureStream(streamId);
+                return this.exchangeWebRtcOffer(streamId, offerSdp, iceServers, true);
+            }
+
+            if (!response.ok) {
+                const body = await response.text().catch(() => '');
+                throw new Error(
+                    `go2rtc WebRTC failed camera=${streamId}${source ? ` (${source.name})` : ''} `
+                    + `mode=${mode} (${response.status}): ${body || response.statusText}`,
+                );
+            }
+
+            const whepLocation = response.headers.get('location') ?? undefined;
+            const whepEtag = response.headers.get('etag') ?? undefined;
+            const answerSdp = await this.#parseAnswerSdp(response);
+            const relayCount = (answerSdp.match(/ typ relay /g) ?? []).length;
+
+            logger.info(
+                `go2rtc WebRTC answer camera=${streamId} mode=${mode} sdp=${answerSdp.length}ch `
+                + `iceServers=${iceServers?.length ?? 0} relay=${relayCount} whep=${whepLocation ? 'yes' : 'no'}`,
+            );
+
+            return { answerSdp, whepLocation, whepEtag };
+        });
     }
 
-    #iceServerLinkHeaders(iceServers?: Go2RtcIceServer[]): Record<string, string> {
-        if (!iceServers?.length) return {};
-
-        const links = iceServers.flatMap(server =>
-            server.urls.map(turnUrl => {
-                const parts = [`<${turnUrl}>`, 'rel="ice-server"'];
-                if (server.username) parts.push(`username="${server.username}"`);
-                if (server.credential) parts.push(`credential="${server.credential}"`);
-                return parts.join('; ');
-            }),
-        );
-
-        return links.length ? { Link: links.join(', ') } : {};
+    /** Close an active go2rtc WHEP session (best-effort). */
+    async closeWebRtcSession(sessionUrl: string): Promise<void> {
+        const url = sessionUrl.startsWith('http') ? sessionUrl : `${this.baseUrl}${sessionUrl}`;
+        try {
+            const response = await fetch(url, { method: 'DELETE' });
+            if (response.ok) {
+                logger.info('go2rtc WebRTC session closed');
+            }
+        } catch (error) {
+            logger.warn(`go2rtc WebRTC session close failed: ${error}`);
+        }
     }
 
     /** Forward trickle ICE candidates to an active go2rtc WHEP session. */
@@ -294,15 +331,50 @@ export class Go2RTCClient {
         return response.headers.get('etag') ?? etag;
     }
 
-    async #streamExists(streamName: string): Promise<boolean> {
+    #expectedStreamNames(): Set<string> {
+        const names = new Set<string>();
+        for (const id of this.sources.keys()) {
+            names.add(this.sanitizeName(id));
+            names.add(this.webrtcStreamName(id));
+        }
+        return names;
+    }
+
+    async #listGo2rtcStreamNames(): Promise<string[]> {
         try {
             const response = await fetch(`${this.baseUrl}/api/streams`);
-            if (!response.ok) return false;
+            if (!response.ok) return [];
             const streams = await response.json() as Record<string, unknown>;
-            return streamName in streams;
+            return Object.keys(streams);
         } catch {
-            return false;
+            return [];
         }
+    }
+
+    async #deleteStreamByName(streamName: string): Promise<boolean> {
+        // go2rtc DELETE uses `src` (stream name); may return 400 if config is read-only but still drops in-memory.
+        const params = new URLSearchParams({ src: streamName });
+        try {
+            const response = await fetch(`${this.baseUrl}/api/streams?${params.toString()}`, {
+                method: 'DELETE',
+            });
+            if (response.ok || response.status === 404) {
+                return true;
+            }
+            const body = await response.text().catch(() => '');
+            if (response.status === 400 && body.includes('read-only')) {
+                return !(await this.#streamExists(streamName));
+            }
+            logger.warn(`Failed to remove go2rtc stream ${streamName}: ${response.status} ${body}`);
+        } catch (error) {
+            logger.warn(`Error removing go2rtc stream ${streamName}: ${error}`);
+        }
+        return false;
+    }
+
+    async #streamExists(streamName: string): Promise<boolean> {
+        const names = await this.#listGo2rtcStreamNames();
+        return names.includes(streamName);
     }
 
     async #parseAnswerSdp(response: Response): Promise<string> {
@@ -325,5 +397,18 @@ export class Go2RTCClient {
             return rtspUrl;
         }
         return `ffmpeg:${rtspUrl}#video=h264`;
+    }
+
+    async #withLock<T>(streamId: string, fn: () => Promise<T>): Promise<T> {
+        const prev = this.locks.get(streamId) ?? Promise.resolve();
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        this.locks.set(streamId, prev.then(() => gate));
+        await prev;
+        try {
+            return await fn();
+        } finally {
+            release();
+        }
     }
 }

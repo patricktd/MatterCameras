@@ -23,9 +23,13 @@ async function main() {
     }
     await bridge.go2rtc.syncAllStreams();
 
+    // Warm ffmpeg H.264 transcoders so the first live view does not hit a 5s+ cold start.
+    await bridge.go2rtc.prewarmAllWebRtc();
+
     // Start Matter only after cameras are on the aggregator (avoids hub seeing empty partsList).
     await bridge.start();
 
+    bridge.go2rtc.startPeriodicPrune();
     startWebServer();
 }
 
