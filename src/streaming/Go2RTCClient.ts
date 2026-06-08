@@ -22,6 +22,8 @@ interface StreamSource {
 export class Go2RTCClient {
     private baseUrl: string;
     private sources = new Map<string, StreamSource>();
+    /** Serialize ffmpeg-heavy ops per camera to avoid starving the other stream. */
+    private readonly locks = new Map<string, Promise<void>>();
 
     constructor(baseUrl: string = 'http://127.0.0.1:3203') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -60,6 +62,48 @@ export class Go2RTCClient {
     async syncAllStreams(): Promise<void> {
         for (const [id, source] of this.sources) {
             await this.addStream(id, source.name, source.rtspUrl);
+        }
+    }
+
+    /**
+     * Start ffmpeg H.264 transcode before the hub opens live view (cold start can exceed 5s).
+     */
+    async prewarmWebRtc(streamId: string, timeoutMs = 30_000): Promise<void> {
+        const webrtcName = this.webrtcStreamName(streamId);
+        const source = this.sources.get(streamId);
+        logger.info(`Pre-warming WebRTC stream ${webrtcName}${source ? ` (${source.name})` : ''}`);
+
+        const started = Date.now();
+        await this.#withLock(streamId, async () => {
+            await this.ensureStream(streamId);
+            const params = new URLSearchParams({ src: webrtcName, width: '320', height: '180' });
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(`${this.baseUrl}/api/frame.jpeg?${params}`, {
+                    signal: controller.signal,
+                });
+                if (!response.ok) {
+                    const body = await response.text().catch(() => '');
+                    throw new Error(`prewarm failed (${response.status}): ${body || response.statusText}`);
+                }
+                const bytes = (await response.arrayBuffer()).byteLength;
+                logger.info(`WebRTC pre-warm ${webrtcName} ok ${bytes}B in ${Date.now() - started}ms`);
+            } finally {
+                clearTimeout(timer);
+            }
+        });
+    }
+
+    /** Pre-warm all registered cameras (parallel). */
+    async prewarmAllWebRtc(): Promise<void> {
+        const ids = [...this.sources.keys()];
+        const results = await Promise.allSettled(ids.map(id => this.prewarmWebRtc(id)));
+        for (let i = 0; i < ids.length; i++) {
+            const result = results[i];
+            if (result.status === 'rejected') {
+                logger.warn(`WebRTC pre-warm failed for ${ids[i]}: ${result.reason}`);
+            }
         }
     }
 
