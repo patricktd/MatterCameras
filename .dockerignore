@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.gitignore
+data/matter-storage
+data/cameras.json
+*.log
+deploy.tar.gz
+*.expect
+.env
+README.md

@@ -1,0 +1,129 @@
+<%- include('partials/header') %>
+
+    <div class="grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+
+        <div>
+            <div class="card">
+                <h2>Add New Camera</h2>
+                <form action="/api/cameras" method="POST">
+                    <label>Camera Name</label>
+                    <input type="text" name="name" placeholder="Front Door" required>
+
+                    <label>RTSP / ONVIF Stream URL</label>
+                    <input type="text" name="rtspUrl" placeholder="rtsp://admin:pass@192.168.1.100:554/stream" required>
+
+                    <label>Video Codec (Optional)</label>
+                    <select name="codec">
+                        <option value="">Auto Detect</option>
+                        <option value="h264">H.264</option>
+                        <option value="h265">H.265</option>
+                    </select>
+
+                    <button type="submit" class="btn">Add Camera</button>
+                </form>
+            </div>
+
+            <div class="camera-list">
+                <% cameras.forEach(cam=> { %>
+                    <div class="camera-card">
+                        <h3>
+                            <%= cam.name %>
+                        </h3>
+                        <p style="color: var(--text-secondary); font-size: 0.8rem; word-break: break-all;">
+                            <%= cam.rtspUrl %>
+                        </p>
+                        <div style="margin-top: 15px;">
+                            <form action="/api/cameras/<%= cam.id %>/delete" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-danger"
+                                    style="padding: 5px 10px; font-size: 0.8rem;">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                    <% }) %>
+            </div>
+        </div>
+
+        <div>
+            <div class="card qr-section">
+                <h2>Pairing (SmartThings)</h2>
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">
+                    Hub e servidor devem estar na mesma rede (192.168.40.x).
+                    Se o QR falhar, use o código manual no app.
+                </p>
+
+                <% if (pairingInfo && pairingInfo.qrCode) { %>
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=<%= encodeURIComponent(pairingInfo.qrCode) %>"
+                        alt="Matter Pairing QR">
+
+                    <div style="margin-top: 12px; font-size: 0.75rem; color: var(--text-secondary); word-break: break-all;">
+                        <%= pairingInfo.qrCode %>
+                    </div>
+
+                    <div style="margin-top: 16px;">
+                        <small>Código manual (SmartThings → Matter → código)</small>
+                        <span class="pairing-code">
+                            <%= pairingInfo.manualPairingCode %>
+                        </span>
+                    </div>
+                    <% } else { %>
+                        <p>
+                            <%= bridgeStatus==='Commissioned' ? 'Device is Commissioned' : 'Starting Bridge...' %>
+                        </p>
+                        <% } %>
+
+                            <div style="margin-top: 24px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button onclick="window.location.reload()" class="btn"
+                                    style="background: #444; flex: 1;">Refresh QR</button>
+
+                                <form action="/api/reset" method="POST" style="flex: 1;"
+                                    onsubmit="return confirm('WARNING: This will factory reset the Matter Bridge and remove all pairings. Are you sure?');">
+                                    <button type="submit" class="btn btn-danger" style="width: 100%;">Reset
+                                        Pairing</button>
+                                </form>
+                            </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+        <h2>System Logs</h2>
+        <div id="log-container"
+            style="background: #1a1a1a; color: #0f0; padding: 1rem; height: 300px; overflow-y: scroll; font-family: monospace; border-radius: 4px; border: 1px solid #333;">
+            <div style="color: #666;">Waiting for logs...</div>
+        </div>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        let isScrolledToBottom = true;
+
+        logContainer.addEventListener('scroll', () => {
+            isScrolledToBottom = Math.abs(logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop) < 10;
+        });
+
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const logs = await response.json();
+
+                if (logs.length > 0) {
+                    logContainer.innerHTML = logs.map(log =>
+                        `<div style="margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px;">${log}</div>`
+                    ).join('');
+
+                    if (isScrolledToBottom) {
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+            }
+        }
+
+        // Poll logs every 2 seconds
+        setInterval(fetchLogs, 2000);
+        fetchLogs();
+    </script>
+
+    <%- include('partials/footer') %>

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/matter-storage/
+data/cameras.json
+.env
+*.log
+deploy.tar.gz
+deploy.expect
+*.expect

@@ -1,0 +1,43 @@
+# MatterCameras — deploy no servidor (host network para mDNS/Matter)
+#
+# Portas usadas no host (verifique conflitos com outras apps):
+#   3202  — Web UI
+#   3203  — go2rtc API
+#   5550  — Matter (TCP/UDP)
+#   8554  — go2rtc RTSP relay
+#   8555  — WebRTC (TCP/UDP)
+#   5353  — mDNS (UDP)
+
+services:
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: matter_go2rtc
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data/go2rtc.yaml:/config/go2rtc.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3203/api"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app:
+    build: .
+    container_name: matter_cameras
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - MATTER_STORAGE_PATH=/app/data/matter-storage
+      - MATTER_HOST=${MATTER_HOST:-192.168.1.50}
+      - MATTER_BIND_HOST=0.0.0.0
+      - MATTER_PORT=${MATTER_PORT:-5550}
+      - WEB_PORT=${WEB_PORT:-3202}
+      - GO2RTC_URL=${GO2RTC_URL:-http://127.0.0.1:3203}
+    depends_on:
+      go2rtc:
+        condition: service_healthy
