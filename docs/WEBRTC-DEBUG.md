@@ -61,27 +61,27 @@ ICE candidates delivered session=1 hubEp=0 count=1
 
 ## Verified test log — iOS (2026-06-08, before signaling fix)
 
-**Environment:** iPhone on LAN `192.168.40.120`, bridge `192.168.1.50:8555`, hub TURN `turn-useast1.smartthings.com`.
+**Environment:** iPhone on LAN `192.168.1.120`, bridge `192.168.1.50:8555`, hub TURN `turn-useast1.smartthings.com`.
 
 **Deploy baseline:** app rebuild ~21:03 UTC (concurrency fix: recycle + exchange under one lock, no prewarm in `ProvideOffer`).
 
-### Cameras
+### Cameras (example)
 
 | ID | Name |
 |----|------|
-| `cam-1780882153855` | Camera A |
-| `cam-1780929114600` | Doorbell |
-| `cam-1780937983108` | Frente Esquerda |
-| `cam-1780952746929` | Patrick |
+| `cam-example-1` | Front Door |
+| `cam-example-2` | Driveway |
+| `cam-example-3` | Side Yard |
+| `cam-example-4` | Backyard |
 
 ### Results (operator report + logs)
 
 | Camera | Live view | Audio | Notes |
 |--------|-----------|-------|-------|
-| Doorbell | OK | OK | Sometimes 2nd attempt |
-| Camera A | OK | OK | Sometimes 2nd attempt |
-| Frente Esquerda | OK | OK | Sometimes 2nd attempt |
-| Patrick | OK | OK | First try ~5 s answer delay |
+| Front Door | OK | OK | Sometimes 2nd attempt |
+| Driveway | OK | OK | Sometimes 2nd attempt |
+| Side Yard | OK | OK | Sometimes 2nd attempt |
+| Backyard | OK | OK | First try ~5 s answer delay |
 
 ### Log signatures (success)
 
@@ -101,7 +101,7 @@ ICE candidates delivered session=1 hubEp=0 count=1
 ICE connection state changed: connected
 Handshake Completed
 nominated: true
-192.168.1.50:8555 <-> 192.168.40.120:<ephemeral>
+192.168.1.50:8555 <-> 192.168.1.120:<ephemeral>
 ```
 
 SDP answer ~**2202 chars** (video + Opus audio). Earlier video-only answers were ~2020 chars.
@@ -119,20 +119,20 @@ Example from logs:
 
 | Camera | 1st `ProvideOffer` | Answer delay | 2nd `ProvideOffer` | Answer delay |
 |--------|-------------------|--------------|-------------------|--------------|
-| Frente Esquerda | 21:05:40 | ~5 s | 21:05:58 | ~20 ms |
-| Camera A | 21:06:34 | ~2 s | 21:07:01 | ~20 ms |
-| Patrick | 21:08:00 | ~5 s | 21:08:19 | ~30 ms |
+| Side Yard | 21:05:40 | ~5 s | 21:05:58 | ~20 ms |
+| Driveway | 21:06:34 | ~2 s | 21:07:01 | ~20 ms |
+| Backyard | 21:08:00 | ~5 s | 21:08:19 | ~30 ms |
 
 ---
 
 ## Android blocker (2026-06-08 — superseded; see [root fix](#root-fix--provideofferresponse-before-answer-2026-06-09))
 
-**Bridge is not the bottleneck.** On Android (`192.168.40.63`), logs consistently show:
+**Bridge is not the bottleneck.** On Android (`192.168.1.63`), logs consistently show:
 
 | Stage | Status |
 |-------|--------|
 | Matter signaling | OK — answer + ICE candidates delivered |
-| ICE (warm retry) | Often OK — `nominated: true`, `192.168.40.63` |
+| ICE (warm retry) | Often OK — `nominated: true`, `192.168.1.63` |
 | DTLS | **FAIL** — go2rtc `answer-setup=[passive,passive]` waits for ClientHello; **Android never completes DTLS** |
 | `Handshake Completed` | **Never** observed for `.63` after many builds |
 
@@ -151,7 +151,7 @@ Report to Samsung SmartThings with: Matter bridge, Camera cluster 0x0142, hub of
 
 ## Verified test log — Android (2026-06-08, FAIL)
 
-**Environment:** Android phone on LAN **`192.168.40.63`**, bridge `192.168.1.50:8555`.
+**Environment:** Android phone on LAN **`192.168.1.63`**, bridge `192.168.1.50:8555`.
 
 **Operator report:** live view failed on **all cameras**.
 
@@ -159,10 +159,10 @@ Report to Samsung SmartThings with: Matter bridge, Camera cluster 0x0142, hub of
 
 | Camera | Live view | Signaling | ICE | DTLS | Notes |
 |--------|-----------|-----------|-----|------|-------|
-| Doorbell | FAIL | OK | connected + nominated | **never** | 1st ~5 s answer; hub retry ~12 s |
-| Camera A | FAIL | OK | connected + nominated | **never** | disconnected ~16 s after connect |
-| Frente Esquerda | FAIL | OK | failed (overlap) | **never** | STUN `error response` on retry |
-| Patrick | (not in log window) | — | — | — | operator says all failed |
+| Front Door | FAIL | OK | connected + nominated | **never** | 1st ~5 s answer; hub retry ~12 s |
+| Driveway | FAIL | OK | connected + nominated | **never** | disconnected ~16 s after connect |
+| Side Yard | FAIL | OK | failed (overlap) | **never** | STUN `error response` on retry |
+| Backyard | (not in log window) | — | — | — | operator says all failed |
 
 ### What works on Android (same as iOS)
 
@@ -174,7 +174,7 @@ WebRTC answer delivered session=1 hubEp=0
 ICE candidates delivered session=1 count=1 (×2 + end-of-candidates)
 ```
 
-Signaling and ICE nomination **succeed**. go2rtc selects `192.168.1.50:8555 ↔ 192.168.40.63:<ephemeral>` with `nominated: true`.
+Signaling and ICE nomination **succeed**. go2rtc selects `192.168.1.50:8555 ↔ 192.168.1.63:<ephemeral>` with `nominated: true`.
 
 ### Root cause: DTLS handshake never completes
 
@@ -198,7 +198,7 @@ Hub retries (~12 s) open a **second** PeerConnection while the first is still cl
 
 | | iOS | Android |
 |---|-----|---------|
-| Hub LAN IP | `192.168.40.120` | `192.168.40.63` |
+| Hub LAN IP | `192.168.1.120` | `192.168.1.63` |
 | Hub offer size | ~6962–6974 ch | ~4196–4210 ch |
 | Hub candidates in offer | 32 → 4 filtered | 12 → 4 filtered |
 | `Handshake Completed` after 21:12 | yes (earlier tests) | **none** |
@@ -288,7 +288,9 @@ docker compose build --no-cache go2rtc && docker compose up -d go2rtc
 
 Patches: `patch-ice.diff` (MaxBinding + acceptance waits), `patch-candidates.diff` (host UDP only).
 
-## go2rtc.yaml (production)
+## go2rtc.yaml (per-host)
+
+Use `data/go2rtc.yaml.example` / `scripts/setup.sh` — replace `__LAN_IP__` with the bridge LAN address:
 
 ```yaml
 webrtc:
@@ -303,7 +305,8 @@ webrtc:
 
 ## Deploy procedure
 
-**Never overwrite** `data/cameras.json` or `data/matter-storage/`.
+**Never overwrite** `data/cameras.json`, `data/config.json`, `data/go2rtc.yaml`, or `data/matter-storage/`.
+Configure `deploy.env` first (see `docs/DEPLOY.md`).
 
 ```bash
 ./scripts/deploy.sh          # full

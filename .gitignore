@@ -2,7 +2,10 @@ node_modules/
 dist/
 data/matter-storage/
 data/cameras.json
+data/config.json
+data/go2rtc.yaml
 .env
+deploy.env
 *.log
 deploy.tar.gz
 deploy.expect

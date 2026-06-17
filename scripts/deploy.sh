@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# NEVER rsync these runtime paths from the workstation (see also docs/DEPLOY.md):
+#   data/cameras.json, data/config.json, data/go2rtc.yaml, data/matter-storage/, .env
+
 NO_BUMP=false
 for arg in "$@"; do
     case "$arg" in
@@ -8,10 +11,14 @@ for arg in "$@"; do
     esac
 done
 
-HOST="${DEPLOY_HOST:-192.168.1.50}"
-USER="${DEPLOY_USER:-patricktd}"
-DEST="${DEPLOY_DIR:-/opt/matter-cameras}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=deploy-env.sh
+source "${ROOT}/scripts/deploy-env.sh"
+load_deploy_env "${ROOT}"
+
+HOST="${DEPLOY_HOST}"
+USER="${DEPLOY_USER}"
+DEST="${DEPLOY_DIR}"
 
 if [ "$NO_BUMP" = false ]; then
     node "${ROOT}/scripts/bump-deploy-version.mjs"
@@ -29,8 +36,11 @@ rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
   --exclude '._*' \
   --exclude data/matter-storage \
   --exclude data/cameras.json \
+  --exclude data/config.json \
+  --exclude data/go2rtc.yaml \
   --exclude '*.expect' \
   --exclude .env \
+  --exclude deploy.env \
   "${ROOT}/" "${USER}@${HOST}:${DEST}/"
 
 echo "==> Building and starting containers..."
@@ -38,7 +48,7 @@ ssh "${USER}@${HOST}" bash -s <<EOF
 set -euo pipefail
 cd "${DEST}"
 mkdir -p data
-[ -f data/cameras.json ] || cp data/cameras.json.example data/cameras.json 2>/dev/null || echo '{"cameras":[]}' > data/cameras.json
+[ -f data/cameras.json ] || echo '{"cameras":[]}' > data/cameras.json
 docker compose down 2>/dev/null || true
 docker compose up --build -d
 docker compose ps

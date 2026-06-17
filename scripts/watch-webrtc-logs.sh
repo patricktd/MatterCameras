@@ -2,11 +2,18 @@
 # Tail Matter + go2rtc logs filtered for WebRTC live-view tests.
 # Usage: ./scripts/watch-webrtc-logs.sh [since]
 # Example: ./scripts/watch-webrtc-logs.sh 2m
+#
+# Requires deploy.env (copy deploy.env.example).
 
 set -euo pipefail
 
-HOST="${DEPLOY_HOST:-192.168.1.50}"
-USER_NAME="${DEPLOY_USER:-patricktd}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=deploy-env.sh
+source "${ROOT}/scripts/deploy-env.sh"
+load_deploy_env "${ROOT}"
+
+HOST="${DEPLOY_HOST}"
+USER_NAME="${DEPLOY_USER}"
 SINCE="${1:-1m}"
 
 echo "=== WebRTC log monitor → ${USER_NAME}@${HOST} (since ${SINCE}) ==="

@@ -21,7 +21,8 @@ export interface AppConfig {
     };
 }
 
-const DEFAULT_HOST = '192.168.1.50';
+/** Fallback when no config file / MATTER_HOST; run scripts/setup.sh for a real LAN IP. */
+const DEFAULT_HOST = '127.0.0.1';
 
 const defaults: AppConfig = {
     matterHost: process.env.MATTER_HOST ?? DEFAULT_HOST,

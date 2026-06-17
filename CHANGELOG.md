@@ -80,7 +80,7 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - `scripts/watch-webrtc-logs.sh` — filtered tail of Matter + go2rtc logs for live-view test sessions.
 
 ### Changed
-- **Deploy workflow:** `npm run quick-deploy` / `npm run deploy` bump `package.json` patch (+0.0.1), build, and sync; `package.json` bind-mounted in Docker for live version badge and `GET /api/version`.
+- **Privacy / deploy safety** — removed committed `data/config.json` and `data/go2rtc.yaml`; gitignore runtime config; deploy scripts require `deploy.env` and never rsync `cameras.json`, `config.json`, `go2rtc.yaml`, or `matter-storage/`.
 - README trimmed to quick start + documentation index; install tutorial lives in `docs/INSTALL.md`.
 - Matter `prepareHubOfferForGo2rtc`: LAN-only hub candidates + internal `ice-lite` hint so the bridge can nominate ICE pairs.
 - go2rtc WebRTC source `ffmpeg:…#video=h264#audio=opus` for Matter/SmartThings A/V.

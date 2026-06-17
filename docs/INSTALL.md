@@ -102,9 +102,9 @@ npm start
 
 | File | Purpose |
 |------|---------|
-| `data/config.json` | `matterHost`, ports, go2rtc URL |
+| `data/config.json` | `matterHost`, ports, go2rtc URL (created by `setup.sh`; **do not commit**) |
 | `data/cameras.json` | Camera roster (created on first add; do not delete casually after pairing) |
-| `data/go2rtc.yaml` | WebRTC ICE candidates (must match LAN IP) |
+| `data/go2rtc.yaml` | WebRTC ICE candidates (must match LAN IP; **do not commit**) |
 | `data/matter-storage/` | Matter fabric — **do not delete** after pairing |
 | `.env` | Optional overrides for Docker Compose |
 
