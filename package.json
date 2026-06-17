@@ -1,6 +1,6 @@
 {
   "name": "matter-cameras",
-  "version": "0.3.0-beta",
+  "version": "0.3.5-beta",
   "description": "Bridge RTSP/ONVIF streams to Matter 1.5 cameras for SmartThings",
   "type": "module",
   "main": "dist/main.js",
@@ -8,7 +8,10 @@
     "start": "tsx src/main.ts",
     "build": "tsc",
     "serve": "node dist/main.js",
-    "deploy": "bash scripts/deploy.sh",
+    "bump-deploy": "node scripts/bump-deploy-version.mjs",
+    "setup": "bash scripts/setup.sh",
+    "deploy": "node scripts/bump-deploy-version.mjs && npm run build && bash scripts/deploy.sh --no-bump",
+    "quick-deploy": "node scripts/bump-deploy-version.mjs && npm run build && bash scripts/quick-deploy.sh --no-bump",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

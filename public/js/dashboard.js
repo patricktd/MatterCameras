@@ -44,15 +44,42 @@ function initAddCameraToggle() {
 function initLogs() {
     const logContainer = document.getElementById('log-container');
     const troubleshooting = document.getElementById('troubleshooting-section');
+    const scrollToggle = document.getElementById('log-scroll-toggle');
     if (!logContainer) return;
 
-    let isScrolledToBottom = true;
+    let autoScroll = true;
     let pollTimer = null;
 
+    function isNearBottom() {
+        return Math.abs(
+            logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop,
+        ) < 24;
+    }
+
+    function scrollToBottom() {
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function updateScrollToggle() {
+        if (!scrollToggle) return;
+        const paused = !autoScroll;
+        scrollToggle.textContent = paused ? 'Resume scroll' : 'Pause scroll';
+        scrollToggle.setAttribute('aria-pressed', String(paused));
+    }
+
+    scrollToggle?.addEventListener('click', () => {
+        autoScroll = !autoScroll;
+        updateScrollToggle();
+        if (autoScroll) {
+            scrollToBottom();
+        }
+    });
+
     logContainer.addEventListener('scroll', () => {
-        isScrolledToBottom = Math.abs(
-            logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop
-        ) < 10;
+        if (!isNearBottom()) {
+            autoScroll = false;
+            updateScrollToggle();
+        }
     });
 
     async function fetchLogs() {
@@ -61,12 +88,13 @@ function initLogs() {
             const logs = await response.json();
 
             if (logs.length > 0) {
-                logContainer.innerHTML = logs.map(log =>
-                    `<div style="margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px;">${log}</div>`
+                const ordered = [...logs].reverse();
+                logContainer.innerHTML = ordered.map(log =>
+                    `<div class="log-line">${escapeHtml(log)}</div>`,
                 ).join('');
 
-                if (isScrolledToBottom) {
-                    logContainer.scrollTop = logContainer.scrollHeight;
+                if (autoScroll) {
+                    scrollToBottom();
                 }
             }
         } catch (error) {
@@ -87,6 +115,8 @@ function initLogs() {
         }
     }
 
+    updateScrollToggle();
+
     if (troubleshooting) {
         troubleshooting.addEventListener('toggle', () => {
             if (troubleshooting.open) {
@@ -102,6 +132,14 @@ function initLogs() {
     } else {
         startPolling();
     }
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

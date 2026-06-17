@@ -26,6 +26,7 @@ interface StreamSource {
 }
 
 const DEFAULT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
+const FRAME_CAPTURE_TIMEOUT_MS = 20_000;
 
 export class Go2RTCClient {
     private baseUrl: string;
@@ -49,6 +50,10 @@ export class Go2RTCClient {
 
     unregisterSource(id: string): void {
         this.sources.delete(id);
+    }
+
+    isRegistered(id: string): boolean {
+        return this.sources.has(id);
     }
 
     /** Wait until go2rtc API is reachable (e.g. after container restart). */
@@ -168,14 +173,13 @@ export class Go2RTCClient {
         this.compactHubOfferAt.set(streamId, Date.now());
     }
 
-    /** Pre-warm all registered cameras (parallel). */
+    /** Pre-warm all registered cameras (sequential — avoids RTSP connection bursts on NVRs). */
     async prewarmAllWebRtc(): Promise<void> {
-        const ids = [...this.sources.keys()];
-        const results = await Promise.allSettled(ids.map(id => this.prewarmWebRtc(id)));
-        for (let i = 0; i < ids.length; i++) {
-            const result = results[i];
-            if (result.status === 'rejected') {
-                logger.warn(`WebRTC pre-warm failed for ${ids[i]}: ${result.reason}`);
+        for (const id of this.sources.keys()) {
+            try {
+                await this.prewarmWebRtc(id);
+            } catch (error) {
+                logger.warn(`WebRTC pre-warm failed for ${id}: ${error}`);
             }
         }
     }
@@ -245,32 +249,60 @@ export class Go2RTCClient {
 
     /**
      * Fetch a JPEG snapshot from go2rtc (RTSP frame grab).
-     * Only maxWidth is passed so ffmpeg uses scale=W:-1 and preserves aspect ratio.
+     * Serialized per camera so motion polls and hub CaptureSnapshot do not race the same RTSP source.
      */
-    async captureFrame(streamId: string, maxWidth?: number): Promise<Uint8Array> {
+    async captureFrame(streamId: string, maxWidth?: number, maxHeight?: number): Promise<Uint8Array> {
+        return this.#withLock(streamId, () => this.#captureFrameUnlocked(streamId, maxWidth, maxHeight));
+    }
+
+    async #captureFrameUnlocked(streamId: string, maxWidth?: number, maxHeight?: number): Promise<Uint8Array> {
+        if (!this.sources.has(streamId)) {
+            throw new Error(`no go2rtc stream registered for ${streamId}`);
+        }
+
         await this.ensureStream(streamId);
 
         const streamName = this.sanitizeName(streamId);
         const params = new URLSearchParams({ src: streamName });
         if (maxWidth) params.set('width', String(maxWidth));
+        if (maxHeight) params.set('height', String(maxHeight));
 
-        const response = await fetch(`${this.baseUrl}/api/frame.jpeg?${params}`);
-        if (response.status === 404) {
-            await this.ensureStream(streamId);
-            const retry = await fetch(`${this.baseUrl}/api/frame.jpeg?${params}`);
-            if (!retry.ok) {
-                const body = await retry.text().catch(() => '');
-                throw new Error(`go2rtc frame capture failed (${retry.status}): ${body || retry.statusText}`);
+        const fetchFrame = async () => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), FRAME_CAPTURE_TIMEOUT_MS);
+            try {
+                const response = await fetch(`${this.baseUrl}/api/frame.jpeg?${params}`, {
+                    signal: controller.signal,
+                });
+                if (response.status === 404) {
+                    await this.ensureStream(streamId);
+                    const retry = await fetch(`${this.baseUrl}/api/frame.jpeg?${params}`, {
+                        signal: controller.signal,
+                    });
+                    if (!retry.ok) {
+                        const body = await retry.text().catch(() => '');
+                        throw new Error(`go2rtc frame capture failed (${retry.status}): ${body || retry.statusText}`);
+                    }
+                    return new Uint8Array(await retry.arrayBuffer());
+                }
+
+                if (!response.ok) {
+                    const body = await response.text().catch(() => '');
+                    throw new Error(`go2rtc frame capture failed (${response.status}): ${body || response.statusText}`);
+                }
+
+                return new Uint8Array(await response.arrayBuffer());
+            } catch (error) {
+                if (error instanceof Error && error.name === 'AbortError') {
+                    throw new Error(`go2rtc frame capture timed out after ${FRAME_CAPTURE_TIMEOUT_MS}ms`);
+                }
+                throw error;
+            } finally {
+                clearTimeout(timer);
             }
-            return new Uint8Array(await retry.arrayBuffer());
-        }
+        };
 
-        if (!response.ok) {
-            const body = await response.text().catch(() => '');
-            throw new Error(`go2rtc frame capture failed (${response.status}): ${body || response.statusText}`);
-        }
-
-        return new Uint8Array(await response.arrayBuffer());
+        return fetchFrame();
     }
 
     /**

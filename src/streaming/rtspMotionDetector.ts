@@ -1,5 +1,6 @@
 import { Logger } from '@matter/general';
 import type { Go2RTCClient } from './Go2RTCClient.js';
+import { motionConfig } from '../config/motion.js';
 
 const logger = Logger.get('MotionDetect');
 
@@ -8,14 +9,23 @@ export interface MotionDetectorOptions {
     pollIntervalMs?: number;
     /** Downscaled width for motion samples (height follows aspect ratio). */
     sampleWidth?: number;
-    /** Base motion score threshold (0–1). Lower = more sensitive. */
-    baseThreshold?: number;
+    /** Fraction of changed samples to enter motion (0–1). Higher = less sensitive. */
+    triggerRatio?: number;
+    /** Fraction to exit motion while active; must be below triggerRatio (hysteresis). */
+    clearRatio?: number;
+    /** Consecutive active polls required before reporting motion. */
+    activateAfter?: number;
+    /** Consecutive inactive polls required before clearing motion. */
+    deactivateAfter?: number;
 }
 
 const DEFAULT_OPTS: Required<MotionDetectorOptions> = {
-    pollIntervalMs: 2_000,
-    sampleWidth: 160,
-    baseThreshold: 0.06,
+    pollIntervalMs: motionConfig.pollIntervalMs,
+    sampleWidth: 128,
+    triggerRatio: 0.14,
+    clearRatio: 0.08,
+    activateAfter: 2,
+    deactivateAfter: 4,
 };
 
 /**
@@ -25,17 +35,26 @@ const DEFAULT_OPTS: Required<MotionDetectorOptions> = {
 export class RtspMotionDetector {
     readonly #cameraId: string;
     readonly #onActive: (active: boolean) => void;
+    readonly #onPulse: () => void;
     readonly #opts: Required<MotionDetectorOptions>;
     #timer?: ReturnType<typeof setInterval>;
     #previous?: Uint8Array;
     #polling = false;
-    #sensitivity = 5;
+    #sensitivity = 3;
     #sensitivityMax = 10;
     #lastReportedActive = false;
+    #consecutiveActive = 0;
+    #consecutiveInactive = 0;
 
-    constructor(cameraId: string, onActive: (active: boolean) => void, opts?: MotionDetectorOptions) {
+    constructor(
+        cameraId: string,
+        onActive: (active: boolean) => void,
+        onPulse: () => void,
+        opts?: MotionDetectorOptions,
+    ) {
         this.#cameraId = cameraId;
         this.#onActive = onActive;
+        this.#onPulse = onPulse;
         this.#opts = { ...DEFAULT_OPTS, ...opts };
     }
 
@@ -58,6 +77,8 @@ export class RtspMotionDetector {
             this.#timer = undefined;
         }
         this.#previous = undefined;
+        this.#consecutiveActive = 0;
+        this.#consecutiveInactive = 0;
         if (this.#lastReportedActive) {
             this.#lastReportedActive = false;
             this.#onActive(false);
@@ -70,13 +91,14 @@ export class RtspMotionDetector {
         this.#polling = true;
         try {
             const frame = await go2rtc.captureFrame(this.#cameraId, this.#opts.sampleWidth);
-            const active = this.#detectMotion(frame);
+            const ratio = this.#motionRatio(frame);
+            const active = this.#debouncedActive(ratio);
+
             if (active !== this.#lastReportedActive) {
                 this.#lastReportedActive = active;
                 this.#onActive(active);
             } else if (active) {
-                // Keep the zone trigger state machine aware of ongoing motion.
-                this.#onActive(true);
+                this.#onPulse();
             }
         } catch (error) {
             logger.warn(`Motion poll failed camera=${this.#cameraId}: ${error}`);
@@ -85,35 +107,61 @@ export class RtspMotionDetector {
         }
     }
 
-    #detectMotion(frame: Uint8Array): boolean {
-        const previous = this.#previous;
-        this.#previous = frame;
-        if (!previous) return false;
+    #debouncedActive(ratio: number): boolean {
+        const threshold = this.#lastReportedActive ? this.#clearThreshold() : this.#triggerThreshold();
 
-        const score = motionScore(previous, frame);
-        const threshold = this.#threshold();
-        return score >= threshold;
+        if (ratio >= threshold) {
+            this.#consecutiveActive++;
+            this.#consecutiveInactive = 0;
+            const need = this.#lastReportedActive ? 1 : this.#opts.activateAfter;
+            return this.#consecutiveActive >= need;
+        }
+
+        this.#consecutiveInactive++;
+        this.#consecutiveActive = 0;
+        const need = this.#lastReportedActive ? this.#opts.deactivateAfter : 1;
+        if (this.#lastReportedActive && this.#consecutiveInactive < need) {
+            return true;
+        }
+        return false;
     }
 
-    #threshold(): number {
-        // sensitivity 1 (low) → higher threshold; sensitivity max → baseThreshold
-        const t = (this.#sensitivityMax - this.#sensitivity) / Math.max(1, this.#sensitivityMax - 1);
-        return this.#opts.baseThreshold + t * 0.12;
+    #motionRatio(frame: Uint8Array): number {
+        const previous = this.#previous;
+        this.#previous = frame;
+        if (!previous) return 0;
+        return changedSampleRatio(previous, frame);
+    }
+
+    /** Lower sensitivity number → higher threshold (less false triggers). */
+    #triggerThreshold(): number {
+        const span = Math.max(1, this.#sensitivityMax - 1);
+        const t = (this.#sensitivityMax - this.#sensitivity) / span;
+        return this.#opts.triggerRatio + t * 0.10;
+    }
+
+    #clearThreshold(): number {
+        const span = Math.max(1, this.#sensitivityMax - 1);
+        const t = (this.#sensitivityMax - this.#sensitivity) / span;
+        return this.#opts.clearRatio + t * 0.05;
     }
 }
 
-/** Subsampled mean absolute byte delta on JPEG payloads (skips headers). */
-function motionScore(prev: Uint8Array, curr: Uint8Array): number {
-    const headerSkip = 512;
+/** Subsampled ratio of byte pairs that differ beyond JPEG noise (skips headers). */
+function changedSampleRatio(prev: Uint8Array, curr: Uint8Array): number {
+    const headerSkip = 1024;
     const len = Math.min(prev.length, curr.length);
     if (len <= headerSkip) return 0;
 
-    let diff = 0;
+    let changed = 0;
     let samples = 0;
-    const step = 48;
+    const step = 64;
+    const deltaMin = 18;
     for (let i = headerSkip; i < len; i += step) {
-        diff += Math.abs(prev[i] - curr[i]);
+        if (Math.abs(prev[i] - curr[i]) >= deltaMin) {
+            changed++;
+        }
         samples++;
     }
-    return samples > 0 ? diff / samples / 255 : 0;
+    return samples > 0 ? changed / samples : 0;
 }

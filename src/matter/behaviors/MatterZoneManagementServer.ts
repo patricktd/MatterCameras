@@ -28,7 +28,8 @@ interface TriggerRuntime {
 }
 
 /**
- * Matter 1.5 Zone Management — emits ZoneTriggered / ZoneStopped for SmartThings routines.
+ * Matter 1.5 Zone Management — ZoneTriggered events + OccupancySensing for SmartThings
+ * motionSensor routines (matter-switch maps occupancy, not zone events, to automations).
  * Motion source: generic RTSP frame-diff via MotionDetectionService (not vendor-specific).
  */
 export class MatterZoneManagementServer extends ZoneMgmtServer {
@@ -42,13 +43,20 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
         this.#syncRuntimeFromState();
 
         streamContext.reportMotionActivity.set(cameraId, active => this.#onMotionActivity(active));
+        streamContext.reportMotionPulse.set(cameraId, () => this.#onMotionPulseContinued());
+
+        this.#applyMotionSensitivity(cameraId, DEFAULT_MOTION_ZONE_ID);
+
         const msg = `ZoneManagement ready camera=${cameraId} zones=${this.state.zones?.length ?? 0}`;
         logger.info(msg);
         console.log(msg);
     }
 
     override async [Symbol.asyncDispose](): Promise<void> {
-        streamContext.reportMotionActivity.delete(String(this.endpoint.id));
+        const cameraId = String(this.endpoint.id);
+        streamContext.reportMotionActivity.delete(cameraId);
+        streamContext.reportMotionPulse.delete(cameraId);
+        streamContext.motionSensitivity.delete(cameraId);
         for (const rt of this.#runtime.values()) {
             this.#clearTimers(rt);
         }
@@ -71,7 +79,8 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
         }
         this.state.triggers = triggers;
         this.#syncRuntimeFromState();
-        logger.info(`Trigger updated camera=${this.endpoint.id} zone=${trigger.zoneId}`);
+        this.#applyMotionSensitivity(String(this.endpoint.id), trigger.zoneId);
+        logger.info(`Trigger updated camera=${this.endpoint.id} zone=${trigger.zoneId} sensitivity=${trigger.sensitivity ?? 'default'}`);
     }
 
     override async removeTrigger(request: ZoneManagement.RemoveTriggerRequest): Promise<void> {
@@ -151,20 +160,22 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
 
     #onMotionActivity(active: boolean): void {
         const now = Date.now();
-        for (const [zoneId, rt] of this.#runtime) {
-            if (zoneId !== DEFAULT_MOTION_ZONE_ID) {
-                continue;
-            }
-            if (now < rt.blindUntil) {
-                return;
-            }
-
-            if (active) {
-                this.#onMotionPulse(zoneId, rt, now);
-            } else if (rt.triggered && now >= rt.extendedUntil) {
-                this.#emitStopped(zoneId, rt, Zm.ZoneEventStoppedReason.ActionStopped);
-            }
+        const rt = this.#runtime.get(DEFAULT_MOTION_ZONE_ID);
+        if (!rt || now < rt.blindUntil) {
+            return;
         }
+
+        if (active) {
+            this.#onMotionPulse(DEFAULT_MOTION_ZONE_ID, rt, now);
+        } else if (rt.triggered && now >= rt.extendedUntil) {
+            this.#emitStopped(DEFAULT_MOTION_ZONE_ID, rt, Zm.ZoneEventStoppedReason.ActionStopped);
+        }
+    }
+
+    #onMotionPulseContinued(): void {
+        const rt = this.#runtime.get(DEFAULT_MOTION_ZONE_ID);
+        if (!rt?.triggered) return;
+        this.#onMotionPulse(DEFAULT_MOTION_ZONE_ID, rt, Date.now());
     }
 
     #onMotionPulse(zoneId: number, rt: TriggerRuntime, now: number): void {
@@ -231,6 +242,17 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
             new Zm.ZoneStoppedEvent({ zone: zoneId, reason }),
             this.context,
         );
+    }
+
+    #applyMotionSensitivity(cameraId: string, zoneId: number): void {
+        if (zoneId !== DEFAULT_MOTION_ZONE_ID) return;
+        const trigger = (this.state.triggers ?? []).find(t => t.zoneId === zoneId);
+        if (!trigger) return;
+        streamContext.motionSensitivity.set(cameraId, {
+            level: trigger.sensitivity ?? 3,
+            max: this.state.sensitivityMax ?? 10,
+        });
+        streamContext.refreshMotionSensitivity?.(cameraId);
     }
 
     #setOccupancy(occupied: boolean): void {

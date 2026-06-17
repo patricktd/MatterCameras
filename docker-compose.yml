@@ -38,8 +38,12 @@ services:
     network_mode: host
     volumes:
       - ./data:/app/data
+      # quick-deploy.sh syncs package.json so /api/version and UI badge match the deployed build.
+      - ./package.json:/app/package.json:ro
       # quick-deploy.sh syncs dist/ on the host; bind-mount so restarts pick up JS without image rebuild.
       - ./dist:/app/dist:ro
+      - ./views:/app/views:ro
+      - ./public:/app/public:ro
     environment:
       - NODE_ENV=production
       - MATTER_STORAGE_PATH=/app/data/matter-storage

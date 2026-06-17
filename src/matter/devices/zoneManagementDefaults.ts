@@ -38,7 +38,7 @@ export function zoneManagementDefaults(): Partial<ZoneManagement.Attributes> {
                 augmentationDuration: 5,
                 maxDuration: 120,
                 blindDuration: 30,
-                sensitivity: 5,
+                sensitivity: 3,
             }),
         ],
         sensitivityMax: 10,

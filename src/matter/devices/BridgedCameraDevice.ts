@@ -8,7 +8,7 @@ import { cameraAvStreamDefaults } from './cameraAvStreamDefaults.js';
 import { zoneManagementDefaults } from './zoneManagementDefaults.js';
 import { occupancySensingDefaults } from './occupancySensingDefaults.js';
 import { Camera } from '../../types/index.js';
-import { appVersion, matterSoftwareVersion } from '../../config/version.js';
+import { getMatterSoftwareVersion, getMatterSoftwareVersionString } from '../../config/version.js';
 
 /**
  * Matter 1.5 Camera device type (0x0142) exposed as a bridged endpoint.
@@ -34,8 +34,8 @@ export function bridgedCameraOptions(camera: Camera) {
             uniqueId: `${camera.id}-uid`,
             hardwareVersion: 1,
             hardwareVersionString: '1.0',
-            softwareVersion: matterSoftwareVersion,
-            softwareVersionString: appVersion,
+            softwareVersion: getMatterSoftwareVersion(),
+            softwareVersionString: getMatterSoftwareVersionString(),
         },
         cameraAvStreamManagement: cameraAvStreamDefaults(),
         zoneManagement: zoneManagementDefaults(),

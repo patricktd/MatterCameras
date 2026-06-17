@@ -10,20 +10,24 @@ export class MotionDetectionService {
     readonly #detectors = new Map<string, RtspMotionDetector>();
 
     startCamera(cameraId: string, go2rtc: Go2RTCClient): void {
-        if (this.#detectors.has(cameraId)) return;
+        let detector = this.#detectors.get(cameraId);
+        if (!detector) {
+            detector = new RtspMotionDetector(
+                cameraId,
+                active => streamContext.reportMotionActivity.get(cameraId)?.(active),
+                () => streamContext.reportMotionPulse.get(cameraId)?.(),
+            );
+            this.#detectors.set(cameraId, detector);
+            detector.start(go2rtc);
+            const msg = `Motion service watching camera=${cameraId}`;
+            logger.info(msg);
+            console.log(msg);
+        }
 
-        const detector = new RtspMotionDetector(cameraId, active => {
-            const report = streamContext.reportMotionActivity.get(cameraId);
-            if (report) {
-                report(active);
-            }
-        });
-
-        this.#detectors.set(cameraId, detector);
-        detector.start(go2rtc);
-        const msg = `Motion service watching camera=${cameraId}`;
-        logger.info(msg);
-        console.log(msg);
+        const sensitivity = streamContext.motionSensitivity.get(cameraId);
+        if (sensitivity) {
+            detector.setSensitivity(sensitivity.level, sensitivity.max);
+        }
     }
 
     stopCamera(cameraId: string): void {
@@ -32,6 +36,16 @@ export class MotionDetectionService {
         detector.stop();
         this.#detectors.delete(cameraId);
         streamContext.reportMotionActivity.delete(cameraId);
+        streamContext.reportMotionPulse.delete(cameraId);
+        streamContext.motionSensitivity.delete(cameraId);
+    }
+
+    applySensitivity(cameraId: string): void {
+        const detector = this.#detectors.get(cameraId);
+        const sensitivity = streamContext.motionSensitivity.get(cameraId);
+        if (detector && sensitivity) {
+            detector.setSensitivity(sensitivity.level, sensitivity.max);
+        }
     }
 
     stopAll(): void {

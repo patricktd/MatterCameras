@@ -127,16 +127,37 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
 
         const cameraId = String(this.endpoint.id);
         let maxWidth = clampSnapshotWidth(request.requestedResolution?.width);
+        let maxHeight: number | undefined;
+
+        if (!go2rtc.isRegistered(cameraId)) {
+            logger.error(
+                `CaptureSnapshot camera=${cameraId} — no go2rtc stream (orphan Matter endpoint? check cameras.json vs matter-storage)`,
+            );
+            throw new Error(`Camera ${cameraId} is not registered in go2rtc`);
+        }
 
         logger.info(`CaptureSnapshot camera=${cameraId} maxWidth=${maxWidth} (aspect preserved)`);
 
         let jpeg: Uint8Array;
         try {
-            jpeg = await go2rtc.captureFrame(cameraId, maxWidth);
+            jpeg = await go2rtc.captureFrame(cameraId, maxWidth, maxHeight);
             while (jpeg.byteLength > MAX_SNAPSHOT_BYTES && maxWidth > MIN_SNAPSHOT_WIDTH) {
                 maxWidth = Math.max(MIN_SNAPSHOT_WIDTH, Math.round(maxWidth * 0.75));
                 logger.info(`CaptureSnapshot retry maxWidth=${maxWidth} (was ${jpeg.byteLength} bytes)`);
-                jpeg = await go2rtc.captureFrame(cameraId, maxWidth);
+                jpeg = await go2rtc.captureFrame(cameraId, maxWidth, maxHeight);
+            }
+            // High-detail scenes can still exceed Matter frame limits at min width — cap height too.
+            if (jpeg.byteLength > MAX_SNAPSHOT_BYTES) {
+                maxHeight = 360;
+                logger.info(`CaptureSnapshot retry maxHeight=${maxHeight} (was ${jpeg.byteLength} bytes)`);
+                jpeg = await go2rtc.captureFrame(cameraId, maxWidth, maxHeight);
+            }
+            if (jpeg.byteLength > MAX_SNAPSHOT_BYTES) {
+                maxHeight = 240;
+                jpeg = await go2rtc.captureFrame(cameraId, maxWidth, maxHeight);
+            }
+            if (jpeg.byteLength > MAX_SNAPSHOT_BYTES) {
+                throw new Error(`JPEG still ${jpeg.byteLength} bytes after resize (Matter limit ${MAX_SNAPSHOT_BYTES})`);
             }
         } catch (error) {
             logger.error(`CaptureSnapshot failed camera=${cameraId}: ${error}`);

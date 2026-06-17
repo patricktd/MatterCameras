@@ -1,0 +1,6 @@
+{
+  "matterHost": "__LAN_IP__",
+  "matterPort": 5550,
+  "webPort": 3202,
+  "go2rtcUrl": "http://127.0.0.1:3203"
+}

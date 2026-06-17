@@ -7,5 +7,7 @@ const __dirname = dirname(__filename);
 // In src/config -> root is ../..
 export const PROJECT_ROOT = join(__dirname, '../../');
 export const DATA_DIR = join(PROJECT_ROOT, 'data');
+export const MATTER_STORAGE_DIR = join(DATA_DIR, 'matter-storage');
 export const DB_FILE = join(DATA_DIR, 'cameras.json');
+export const SETTINGS_FILE = join(DATA_DIR, 'settings.json');
 export const CONFIG_FILE = join(DATA_DIR, 'config.json');

@@ -45,9 +45,11 @@ Matter 1.5 motion for routines uses the **Zone Management** cluster, not a vendo
 
 `MotionDetectionService` polls a low-res JPEG from go2rtc every 2 s and compares consecutive frames (byte delta). No UniFi/ONVIF-specific code — works on any RTSP URL go2rtc can ingest.
 
-When motion is detected, the bridge emits Matter `ZoneTriggered` to the hub. SmartThings routines can use:
+When motion is detected, the bridge emits `ZoneTriggered` / `ZoneStopped` and updates **OccupancySensing**. SmartThings matter-switch maps occupancy to **motionSensor**, so routines use:
 
 **IF → Device status → Camera → Motion detected**
+
+(`ZoneTriggered` alone does not appear in the routine picker; it drives `zoneManagement` state on the hub.)
 
 ### Logs to watch
 

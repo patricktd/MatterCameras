@@ -1,12 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+NO_BUMP=false
+for arg in "$@"; do
+    case "$arg" in
+        --no-bump) NO_BUMP=true ;;
+    esac
+done
+
 HOST="${DEPLOY_HOST:-192.168.1.50}"
 USER="${DEPLOY_USER:-patricktd}"
 DEST="${DEPLOY_DIR:-/opt/matter-cameras}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "==> Deploy MatterCameras → ${USER}@${HOST}:${DEST}"
+if [ "$NO_BUMP" = false ]; then
+    node "${ROOT}/scripts/bump-deploy-version.mjs"
+    npm run build --prefix "${ROOT}"
+fi
+
+DEPLOY_VERSION="$(node -p "require('${ROOT}/package.json').version")"
+echo "==> Deploy MatterCameras v${DEPLOY_VERSION} → ${USER}@${HOST}:${DEST}"
 
 rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
   --exclude node_modules \
@@ -35,4 +48,5 @@ echo "go2rtc:  http://${HOST}:3203"
 echo "Matter:  ${HOST}:5550"
 EOF
 
-echo "==> Deploy complete."
+echo "==> Deploy complete (v${DEPLOY_VERSION})."
+echo "    Verify: curl -s http://${HOST}:3202/api/version"

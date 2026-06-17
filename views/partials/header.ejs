@@ -4,20 +4,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MatterCameras Dashboard</title>
+    <title>MatterCameras — <%= typeof pageTitle !== 'undefined' ? pageTitle : 'Dashboard' %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 
 <body>
     <div class="container">
         <header>
-            <h1>MatterCameras</h1>
-            <div id="connection-status">
-                Bridge Status:
-                <span
-                    class="status-badge <%= bridgeStatus === 'Commissioned' ? 'status-commissioned' : 'status-ready' %>">
-                    <%= bridgeStatus %>
-                </span>
+            <div class="header-title">
+                <h1><a href="/" class="header-home-link">MatterCameras</a></h1>
+                <% if (typeof pageTitle !== 'undefined' && pageTitle !== 'Dashboard') { %>
+                    <span class="header-page-title"><%= pageTitle %></span>
+                <% } %>
+            </div>
+            <div class="header-right">
+                <div id="connection-status">
+                    Bridge Status:
+                    <span
+                        class="status-badge <%= bridgeStatus === 'Commissioned' ? 'status-commissioned' : 'status-ready' %>">
+                        <%= bridgeStatus %>
+                    </span>
+                </div>
+                <div class="header-actions">
+                    <% if (typeof activePage === 'undefined' || activePage !== 'options') { %>
+                        <a href="/options" class="btn btn-secondary btn-sm">Options</a>
+                    <% } else { %>
+                        <a href="/" class="btn btn-secondary btn-sm">Dashboard</a>
+                    <% } %>
+                    <form action="/api/restart" method="POST" class="inline-form"
+                        onsubmit="return confirm('Restart the bridge? SmartThings may take ~30s to reconnect.');">
+                        <% if (typeof activePage !== 'undefined' && activePage === 'options') { %>
+                            <input type="hidden" name="returnTo" value="/options">
+                        <% } %>
+                        <button type="submit" class="btn btn-ghost btn-sm">Restart Bridge</button>
+                    </form>
+                </div>
             </div>
         </header>
         <%- include('info-bar') %>

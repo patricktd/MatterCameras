@@ -1,0 +1,16 @@
+api:
+  listen: ":3203"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"
+  candidates:
+    - __LAN_IP__:8555
+  ice_servers: []
+  filters:
+    networks: [udp4]
+    ips: [__LAN_IP__]
+
+streams: {}

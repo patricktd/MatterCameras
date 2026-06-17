@@ -1,4 +1,4 @@
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle: 'Dashboard', bridgeStatus, appVersion, activePage: 'dashboard' }) %>
 
     <% const isCommissioned = bridgeStatus === 'Commissioned'; %>
     <% const addFormOpen = cameras.length === 0; %>
@@ -36,6 +36,13 @@
                         </details>
 
                         <button type="submit" class="btn">Add Camera</button>
+                        <% if (isCommissioned) { %>
+                            <p class="field-hint" style="margin-top: 12px;">
+                                New cameras are exposed on the Matter bridge immediately (PartsList update).
+                                SmartThings usually picks them up within a minute; if not, open
+                                <strong>MatterCameras Bridge</strong> and pull down to refresh.
+                            </p>
+                        <% } %>
                     </form>
                 </div>
             </div>
@@ -110,7 +117,8 @@
                     <div class="pairing-success">
                         <p><strong>Bridge paired successfully.</strong></p>
                         <p style="margin-top: 8px; color: var(--text-secondary);">
-                            Add or edit cameras on the left. They will appear automatically in SmartThings.
+                            Add or remove cameras on the left. When the bridge is paired, the app restarts
+                            automatically so SmartThings picks up the updated camera list (about 15 seconds).
                         </p>
                     </div>
                 <% } else { %>
@@ -163,6 +171,11 @@
             <p class="troubleshooting-hint">
                 System logs for advanced users. Open this section if you need to diagnose connection or streaming issues.
             </p>
+            <div class="log-toolbar">
+                <button type="button" id="log-scroll-toggle" class="btn btn-secondary btn-sm" aria-pressed="false">
+                    Pause scroll
+                </button>
+            </div>
             <div id="log-container">
                 <div class="log-placeholder">Waiting for logs...</div>
             </div>

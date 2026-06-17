@@ -61,21 +61,36 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 ## [Unreleased]
 
 ### Added
+- **Deploy version bump** — `scripts/bump-deploy-version.mjs` increments `package.json` patch by +0.0.1 on each `npm run quick-deploy` / `npm run deploy`; verify server with `GET /api/version` or Web UI badge.
+- `GET /api/diagnostics/snapshots` — per-camera go2rtc snapshot health check (hub-independent).
+- `docs/INSTALL.md` — step-by-step tester guide (pairing, cameras, troubleshooting).
+- `docs/DEPLOY.md` — production rsync deploy (moved out of README).
+- `data/config.json.example` and `data/go2rtc.yaml.example` — host-agnostic templates for new installs.
+- Web UI **Options** panel and **Restart Bridge** button.
 - Matter 1.5 **Zone Management** (`0x0550`) with full-viewport motion zone and `ZoneTriggered` / `ZoneStopped` events for SmartThings routines.
 - **OccupancySensing** cluster on bridged cameras for SmartThings routine picker (`motionSensor` capability after hub reprofile).
 - Generic **RTSP motion detection** via go2rtc JPEG frame comparison (`MotionDetectionService`); no vendor-specific APIs.
 - `docs/MATTER-CAMERA.md` — snapshots in notifications, motion routines, and cloud recording gap analysis.
 - `docs/AGENT-CONTEXT.md` — agent handoff (deploy safety, feature matrix, known issues, log commands).
 - `matterSoftwareVersion` (301) on bridged cameras to trigger SmartThings camera reprofile after new clusters.
-- Docker bind-mount `./dist:/app/dist:ro` so `quick-deploy.sh` updates running container without image rebuild.
+- Docker bind-mount `./dist`, `./views`, and `./public` (read-only) so `quick-deploy.sh` updates running container without image rebuild.
 - SmartThings **live view (WebRTC)** on **iOS and Android** — operator confirmed 2026-06-09; **audio (Opus)** on both platforms (see `docs/WEBRTC-DEBUG.md`).
 - Hub offer SDP diagnostics (`setup`, fingerprint, candidate count) on each `ProvideOffer`.
 - Android/compact-hub path: keep full hub ICE in go2rtc offer copy, prewarm before exchange, recycle on hub retry; inline bridge ICE candidates in answer SDP. Compact detection uses AND (small SDP + few candidates) so iOS is unaffected.
 - `scripts/watch-webrtc-logs.sh` — filtered tail of Matter + go2rtc logs for live-view test sessions.
+
+### Changed
+- **Deploy workflow:** `npm run quick-deploy` / `npm run deploy` bump `package.json` patch (+0.0.1), build, and sync; `package.json` bind-mounted in Docker for live version badge and `GET /api/version`.
+- README trimmed to quick start + documentation index; install tutorial lives in `docs/INSTALL.md`.
 - Matter `prepareHubOfferForGo2rtc`: LAN-only hub candidates + internal `ice-lite` hint so the bridge can nominate ICE pairs.
 - go2rtc WebRTC source `ffmpeg:…#video=h264#audio=opus` for Matter/SmartThings A/V.
-
+- Camera add/remove while paired uses runtime Matter endpoint updates + `PartsList` / `softwareVersion` announce (no automatic restart); see `docs/MATTER-BRIDGE.md`.
+- Motion detection: less sensitive frame-diff (hysteresis, debounce, changed-pixel ratio) and default zone sensitivity 3; reduces false triggers on outdoor cameras.
 ### Fixed
+- **Reset Pairing UX:** factory reset now returns a status page (with auto-reconnect polling) before the process exits, and the Web UI starts early during boot so the dashboard is reachable within seconds instead of after the full WebRTC pre-warm (~50s).
+- **Reset Pairing crash loop:** Web UI factory reset takes the bridge offline, closes Matter storage, and deletes all of `data/matter-storage/` before exit. Previously `server.erase()` left orphaned peer records; Docker restart then failed with `FabricNotFoundError` until manual storage cleanup.
+- **Motion routines:** always update `OccupancySensing` on zone trigger/stop. SmartThings matter-switch maps `motionSensor` automations from occupancy, not `ZoneTriggered` events.
+- **Hub sensitivity changes:** `createOrUpdateTrigger` from SmartThings now refreshes RTSP motion detector sensitivity live.
 - **Live view signaling order:** defer `WebRtcTransportRequestor.answer` until after `ProvideOfferResponse` (hub creates session on response per Matter 1.5 §11.5.7.4). Fixes `NotFound (139)` on iOS/Android, enables fast first-attempt load; earlier Android “DTLS blocker” was this bug, not an app defect.
 - Zone Management startup crash (`maxUserDefinedZones` must be ≥ 5 per Matter constraint).
 - Snapshot previews preserve camera aspect ratio (`scale=width:-1` in go2rtc); Matter response reports actual JPEG dimensions instead of forcing 640×360.
