@@ -152,7 +152,6 @@ export class MatterBridge {
             bridgedCameraOptions(camera),
         );
         this.cameraEndpoints.set(camera.id, endpoint);
-        this.motionDetection.startCamera(camera.id, this.go2rtc);
 
         if (this.started) {
             await this.notifyHubStructureChange();
@@ -185,6 +184,11 @@ export class MatterBridge {
         await endpoint.setStateOf(BridgedDeviceBasicInformationServer, {
             nodeLabel: camera.name,
         });
+    }
+
+    /** Start RTSP motion polling — call only after go2rtc stream is registered for this camera. */
+    startMotionDetection(cameraId: string): void {
+        this.motionDetection.startCamera(cameraId, this.go2rtc);
     }
 
     async removeCamera(id: string) {

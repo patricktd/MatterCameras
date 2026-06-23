@@ -1,6 +1,6 @@
 {
   "name": "matter-cameras",
-  "version": "0.3.5-beta",
+  "version": "0.3.7-beta",
   "description": "Bridge RTSP/ONVIF streams to Matter 1.5 cameras for SmartThings",
   "type": "module",
   "main": "dist/main.js",

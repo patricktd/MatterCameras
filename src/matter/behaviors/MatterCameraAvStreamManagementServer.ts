@@ -3,6 +3,7 @@ import { CameraAvStreamManagement } from '@matter/types/clusters/camera-av-strea
 import { StreamUsage } from '@matter/types';
 import { Logger } from '@matter/general';
 import { normalizeJpeg, readJpegDimensions } from '../../streaming/normalizeJpeg.js';
+import { imageTransformFromMatterState } from '../../streaming/imageTransform.js';
 import { streamContext } from './streamContext.js';
 import {
     createDefaultAudioStream,
@@ -32,6 +33,25 @@ const CameraAvServer = BaseCameraAvStreamManagementServer.with(
  */
 export class MatterCameraAvStreamManagementServer extends CameraAvServer {
     static override readonly id = 'cameraAvStreamManagement';
+
+    override initialize(): void {
+        const apply = () => this.#applyImageTransformToGo2rtc();
+        this.maybeReactTo(this.events.imageFlipHorizontal$Changed, apply);
+        this.maybeReactTo(this.events.imageFlipVertical$Changed, apply);
+        this.maybeReactTo(this.events.imageRotation$Changed, apply);
+        apply();
+    }
+
+    #applyImageTransformToGo2rtc(): void {
+        const go2rtc = streamContext.go2rtc;
+        if (!go2rtc) return;
+
+        const cameraId = String(this.endpoint.id);
+        const transform = imageTransformFromMatterState(this.state);
+        void go2rtc.setImageTransform(cameraId, transform).catch(error => {
+            logger.warn(`ImageControl go2rtc refresh failed camera=${cameraId}: ${error}`);
+        });
+    }
 
     override async setStreamPriorities(request: CameraAvStreamManagement.SetStreamPrioritiesRequest) {
         if (request.streamPriorities?.length) {

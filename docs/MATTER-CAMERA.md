@@ -9,6 +9,7 @@ Bridge device type: **Camera `0x0142`** (bridged endpoint per RTSP camera).
 | Live view (iOS) | WebRTC Transport Provider | OK | OK — fast first attempt |
 | Live view (Android) | WebRTC Transport Provider | OK | OK (2026-06-09; was signaling order, not DTLS) |
 | Snapshot / card preview | Camera AV Stream Management | OK | OK |
+| Image flip / rotation | ImageControl (AV cluster) | OK | OK — set in device settings; re-open live view after change |
 | **Notification image** | `CaptureSnapshot` | OK | **OK** — JPEG appears in push notification |
 | Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | RTSP frame-diff | Hub reprofile (`softwareVersion` 301) or 61.x beta drivers |
 | Cloud recording plan | **Push AV Stream Transport** `0x0555` | **Not implemented** | UI shows plan; **no clips upload** |
@@ -30,7 +31,23 @@ CaptureSnapshot done camera=cam-… 640x853 … bytes
 
 ---
 
-## Motion detection (Zone Management)
+## Image orientation (ImageControl)
+
+SmartThings exposes **flip horizontal**, **flip vertical**, and **rotation** (0–359°) under camera device settings. The hub writes Matter attributes on the bridged endpoint; the bridge rebuilds go2rtc ffmpeg sources with an `-vf` filter chain (`transpose`, `hflip`, `vflip`, or `rotate=` for non-90° steps).
+
+Applies to **live view**, **card snapshots**, and **motion frame sampling** so all paths stay consistent.
+
+**After changing orientation in the app:** close and reopen live view (WebRTC session caches the old ffmpeg graph until the next `ProvideOffer`).
+
+**Defaults (no user change):** snapshot path stays **direct RTSP** for performance; only the WebRTC transcode stream uses ffmpeg — same as before ImageControl.
+
+Logs:
+
+```
+ImageControl applied camera=cam-… flipH=true flipV=false rot=0
+```
+
+---
 
 Matter 1.5 motion for routines uses the **Zone Management** cluster, not a vendor API.
 

@@ -44,8 +44,9 @@ async function main() {
     // Start Matter only after cameras are on the aggregator (avoids hub seeing empty partsList).
     await bridge.start();
 
+    // Motion polls go2rtc JPEG frames — must run only after every stream is registered.
     for (const cam of cameras) {
-        bridge.motionDetection.startCamera(cam.id, bridge.go2rtc);
+        bridge.startMotionDetection(cam.id);
     }
     console.log(`Motion detection active for ${cameras.length} camera(s)`);
 

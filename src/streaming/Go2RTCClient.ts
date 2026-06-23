@@ -1,5 +1,11 @@
 import { Logger } from '@matter/general';
 import { appendTrickleCandidatesToSdp } from '../matter/webrtcIce.js';
+import {
+    type ImageTransform,
+    buildFfmpegSrc,
+    IDENTITY_IMAGE_TRANSFORM,
+    transformsEqual,
+} from './imageTransform.js';
 
 const logger = Logger.get('Go2RTCClient');
 
@@ -36,6 +42,7 @@ export class Go2RTCClient {
     private readonly prewarmAt = new Map<string, number>();
     /** Tracks recent compact-hub (Android) offers per camera for go2rtc recycle. */
     private readonly compactHubOfferAt = new Map<string, number>();
+    private readonly imageTransforms = new Map<string, ImageTransform>();
     private pruneTimer?: ReturnType<typeof setInterval>;
 
     private static readonly COMPACT_HUB_RECYCLE_MS = 120_000;
@@ -54,6 +61,23 @@ export class Go2RTCClient {
 
     isRegistered(id: string): boolean {
         return this.sources.has(id);
+    }
+
+    /** Apply Matter ImageControl (flip/rotation). Rebuilds go2rtc sources only when values change. */
+    async setImageTransform(id: string, transform: ImageTransform): Promise<void> {
+        const prev = this.imageTransforms.get(id) ?? IDENTITY_IMAGE_TRANSFORM;
+        if (transformsEqual(prev, transform)) {
+            return;
+        }
+        this.imageTransforms.set(id, transform);
+        if (!this.sources.has(id)) {
+            return;
+        }
+        await this.#withLock(id, () => this.#refreshStreamSources(id));
+    }
+
+    getImageTransform(id: string): ImageTransform {
+        return this.imageTransforms.get(id) ?? IDENTITY_IMAGE_TRANSFORM;
     }
 
     /** Wait until go2rtc API is reachable (e.g. after container restart). */
@@ -211,33 +235,59 @@ export class Go2RTCClient {
         const webrtcName = this.webrtcStreamName(id);
         this.registerSource(id, _name, rtspUrl);
 
+        const transform = this.getImageTransform(id);
         const entries: Array<{ name: string; src: string }> = [
-            { name: streamName, src: rtspUrl },
-            { name: webrtcName, src: this.#toWebRtcSrc(rtspUrl) },
+            { name: streamName, src: this.#snapshotSrc(rtspUrl, transform) },
+            { name: webrtcName, src: this.#webrtcSrc(rtspUrl, transform) },
         ];
 
         for (const { name, src } of entries) {
-            const params = new URLSearchParams({ src, name });
-            try {
-                const response = await fetch(`${this.baseUrl}/api/streams?${params.toString()}`, {
-                    method: 'PUT',
-                });
-
-                if (!response.ok && response.status !== 400) {
-                    const body = await response.text().catch(() => '');
-                    logger.error(`Failed to add stream ${name}: ${response.status} ${body || response.statusText}`);
-                }
-            } catch (error) {
-                logger.error('Error connecting to go2rtc:', error);
-                throw error;
-            }
+            await this.#putStream(name, src);
         }
 
         logger.info(`Streams ${streamName} + ${webrtcName} added to go2rtc`);
     }
 
+    async #putStream(name: string, src: string): Promise<void> {
+        const params = new URLSearchParams({ src, name });
+        try {
+            const response = await fetch(`${this.baseUrl}/api/streams?${params.toString()}`, {
+                method: 'PUT',
+            });
+
+            if (!response.ok && response.status !== 400) {
+                const body = await response.text().catch(() => '');
+                logger.error(`Failed to add stream ${name}: ${response.status} ${body || response.statusText}`);
+            }
+        } catch (error) {
+            logger.error('Error connecting to go2rtc:', error);
+            throw error;
+        }
+    }
+
+    async #refreshStreamSources(id: string): Promise<void> {
+        const source = this.sources.get(id);
+        if (!source) return;
+
+        const streamName = this.sanitizeName(id);
+        const webrtcName = this.webrtcStreamName(id);
+        const transform = this.getImageTransform(id);
+
+        await this.#deleteStreamByName(streamName);
+        await this.#deleteStreamByName(webrtcName);
+        await this.#putStream(streamName, this.#snapshotSrc(source.rtspUrl, transform));
+        await this.#putStream(webrtcName, this.#webrtcSrc(source.rtspUrl, transform));
+
+        this.prewarmAt.delete(id);
+        logger.info(
+            `ImageControl applied camera=${id} flipH=${transform.flipHorizontal} `
+            + `flipV=${transform.flipVertical} rot=${transform.rotationDegrees}`,
+        );
+    }
+
     async removeStream(id: string): Promise<void> {
         this.unregisterSource(id);
+        this.imageTransforms.delete(id);
         const names = [this.sanitizeName(id), this.webrtcStreamName(id)];
 
         for (const name of names) {
@@ -477,15 +527,12 @@ export class Go2RTCClient {
         return name.replace(/[^a-zA-Z0-9_\-]/g, '_');
     }
 
-    /**
-     * Matter live view: H.264 video + Opus audio (SmartThings WebRTC offer expects both).
-     * UniFi/RTSP sources are transcoded on demand via ffmpeg in go2rtc.
-     */
-    #toWebRtcSrc(rtspUrl: string): string {
-        if (rtspUrl.startsWith('ffmpeg:')) {
-            return rtspUrl;
-        }
-        return `ffmpeg:${rtspUrl}#video=h264#audio=opus`;
+    #snapshotSrc(rtspUrl: string, transform: ImageTransform): string {
+        return buildFfmpegSrc(rtspUrl, transform, { audio: false });
+    }
+
+    #webrtcSrc(rtspUrl: string, transform: ImageTransform): string {
+        return buildFfmpegSrc(rtspUrl, transform, { audio: true });
     }
 
     #normalizeIceServers(iceServers: Go2RtcIceServer[]): Go2RtcIceServer[] {
@@ -605,15 +652,8 @@ export class Go2RTCClient {
 
         const webrtcName = this.webrtcStreamName(streamId);
         await this.#deleteStreamByName(webrtcName);
-        const params = new URLSearchParams({
-            src: this.#toWebRtcSrc(source.rtspUrl),
-            name: webrtcName,
-        });
-        const response = await fetch(`${this.baseUrl}/api/streams?${params}`, { method: 'PUT' });
-        if (!response.ok && response.status !== 400) {
-            const body = await response.text().catch(() => '');
-            throw new Error(`go2rtc recycle failed (${response.status}): ${body || response.statusText}`);
-        }
+        const transform = this.getImageTransform(streamId);
+        await this.#putStream(webrtcName, this.#webrtcSrc(source.rtspUrl, transform));
         this.prewarmAt.delete(streamId);
         logger.info(`Recycled go2rtc WebRTC stream ${webrtcName}`);
     }

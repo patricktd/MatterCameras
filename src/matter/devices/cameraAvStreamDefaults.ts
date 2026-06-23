@@ -57,6 +57,7 @@ export function cameraAvStreamDefaults(): Partial<CameraAvStreamManagement.Attri
         microphoneVolumeLevel: 128,
         microphoneMaxLevel: 254,
         microphoneMinLevel: 0,
+        imageRotation: 0,
         snapshotCapabilities: [{
             resolution: { width: 640, height: 360 },
             maxFrameRate: 1,

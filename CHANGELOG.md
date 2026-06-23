@@ -78,6 +78,7 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - Hub offer SDP diagnostics (`setup`, fingerprint, candidate count) on each `ProvideOffer`.
 - Android/compact-hub path: keep full hub ICE in go2rtc offer copy, prewarm before exchange, recycle on hub retry; inline bridge ICE candidates in answer SDP. Compact detection uses AND (small SDP + few candidates) so iOS is unaffected.
 - `scripts/watch-webrtc-logs.sh` — filtered tail of Matter + go2rtc logs for live-view test sessions.
+- **ImageControl (flip / rotation):** SmartThings `imageFlipHorizontal`, `imageFlipVertical`, and `imageRotation` rebuild go2rtc ffmpeg sources for live view, snapshots, and motion; identity defaults keep raw-RTSP snapshots (see `.cursor/rules/image-control.mdc`).
 
 ### Changed
 - **Privacy / deploy safety** — removed committed `data/config.json` and `data/go2rtc.yaml`; gitignore runtime config; deploy scripts require `deploy.env` and never rsync `cameras.json`, `config.json`, `go2rtc.yaml`, or `matter-storage/`.
@@ -87,7 +88,7 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - Camera add/remove while paired uses runtime Matter endpoint updates + `PartsList` / `softwareVersion` announce (no automatic restart); see `docs/MATTER-BRIDGE.md`.
 - Motion detection: less sensitive frame-diff (hysteresis, debounce, changed-pixel ratio) and default zone sensitivity 3; reduces false triggers on outdoor cameras.
 ### Fixed
-- **Reset Pairing UX:** factory reset now returns a status page (with auto-reconnect polling) before the process exits, and the Web UI starts early during boot so the dashboard is reachable within seconds instead of after the full WebRTC pre-warm (~50s).
+- **Motion detection boot race:** motion polling no longer starts inside `addCamera()` before go2rtc streams exist. The second `startCamera` call was a no-op once the detector was already created, causing startup `no go2rtc stream` warnings and unreliable first polls.
 - **Reset Pairing crash loop:** Web UI factory reset takes the bridge offline, closes Matter storage, and deletes all of `data/matter-storage/` before exit. Previously `server.erase()` left orphaned peer records; Docker restart then failed with `FabricNotFoundError` until manual storage cleanup.
 - **Motion routines:** always update `OccupancySensing` on zone trigger/stop. SmartThings matter-switch maps `motionSensor` automations from occupancy, not `ZoneTriggered` events.
 - **Hub sensitivity changes:** `createOrUpdateTrigger` from SmartThings now refreshes RTSP motion detector sensitivity live.

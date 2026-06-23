@@ -90,6 +90,7 @@ app.post('/api/cameras', async (req, res) => {
     setBridgeCameraCount(storage.getCameras().length);
     await bridge.addCamera(config);
     await bridge.go2rtc.addStream(config.id, config.name, config.rtspUrl);
+    bridge.startMotionDetection(config.id);
 
     res.redirect('/');
 });
