@@ -41,8 +41,22 @@ Typical Zigbee/Wi-Fi Matter bridges (lights, plugs):
 |------|----------------|
 | Aggregator | `AggregatorEndpoint` on endpoint `1` (`src/matter/Bridge.ts`) |
 | Cameras before Matter online | All cameras from `data/cameras.json` are registered **before** `bridge.start()` so the hub never sees an empty `PartsList` |
-| Add/remove while paired | `aggregator.add()` / `endpoint.delete()` at runtime; matter.js updates `PartsList`; bridge bumps `softwareVersion` and logs structure |
-| Hub notification | `notifyHubStructureChange()` after add/remove (no process restart) |
+| Add while paired | Runtime `aggregator.add()` + `PartsList` / `softwareVersion` announce; app **restarts** so the new endpoint exists before Matter networking comes up |
+| Hub notification | `notifyHubStructureChange()` bumps `softwareVersion` and re-reports aggregator `PartsList` |
+
+### SmartThings creates one device per bridged endpoint
+
+At pairing, SmartThings walks the aggregator `PartsList` and creates a **child device for every Matter endpoint**, including empty placeholders. A “slot pool” of reserved camera endpoints therefore showed dozens of useless cameras in the app — **not viable**.
+
+Only **real cameras** from `cameras.json` are exposed on the bridge.
+
+### Why dynamically added cameras may not appear
+
+SmartThings builds its Matter **subscription paths** from the endpoint list seen at **first pairing** (e.g. only `2.*.*` … `7.*.*` for six cameras). When endpoint `8` is added later, the bridge updates `PartsList` and sends reports, but the hub often **does not subscribe** to the new endpoint and does not create a child device.
+
+This is a **SmartThings hub / Matter camera driver limitation**, not a bridge bug. Light bridges sync more reliably than Matter Camera (`0x0142`).
+
+**Workaround:** remove and re-pair the bridge after adding cameras (cameras stay in `data/cameras.json`). Adding cameras **before** the first SmartThings pairing avoids this for the initial roster.
 
 ### Why camera bridges can feel slower than light bridges
 
@@ -69,10 +83,11 @@ CaptureSnapshot camera=cam-…
 
 Try:
 
-1. Open **MatterCameras Bridge** in SmartThings → pull down to refresh.
-2. Wait 2–5 minutes for card preview (hub polling).
-3. Use **Restart Bridge** in the Web UI only as a last resort.
-4. Worst case: remove and re-pair the bridge (cameras stay in `data/cameras.json`).
+1. Wait for the automatic bridge restart after adding a camera in the Web UI.
+2. Open **MatterCameras Bridge** in SmartThings → pull down to refresh.
+3. Wait 2–5 minutes for card preview (hub polling).
+4. **Remove and re-pair the bridge** (cameras stay in `data/cameras.json`) — required if the hub paired before those cameras existed.
+5. Use **Restart Bridge** in the Web UI only as a last resort.
 
 ## Operational limits
 

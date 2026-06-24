@@ -6,6 +6,7 @@ import {
     IDENTITY_IMAGE_TRANSFORM,
     transformsEqual,
 } from './imageTransform.js';
+import { redactRtspInText } from '../utils/redactRtspUrl.js';
 
 const logger = Logger.get('Go2RTCClient');
 
@@ -256,7 +257,7 @@ export class Go2RTCClient {
             });
 
             if (!response.ok && response.status !== 400) {
-                const body = await response.text().catch(() => '');
+                const body = redactRtspInText(await response.text().catch(() => ''));
                 logger.error(`Failed to add stream ${name}: ${response.status} ${body || response.statusText}`);
             }
         } catch (error) {

@@ -1,0 +1,151 @@
+                <div id="add-camera-panel" class="collapsible-panel <%= addFormOpen ? '' : 'hidden' %>">
+                    <p class="field-hint add-camera-intro">
+                        Choose how to connect. Vendor plugins fill RTSP and motion settings for you.
+                    </p>
+
+                    <div id="camera-provider-tabs" class="camera-provider-tabs" role="tablist">
+                        <button type="button" class="camera-provider-tab is-active" data-provider="unifi-protect" role="tab">
+                            UniFi Protect
+                        </button>
+                        <button type="button" class="camera-provider-tab" data-provider="reolink" role="tab">
+                            Reolink
+                        </button>
+                        <button type="button" class="camera-provider-tab" data-provider="tapo-sonoff" role="tab">
+                            Tapo / Sonoff
+                        </button>
+                        <button type="button" class="camera-provider-tab" data-provider="onvif" role="tab">
+                            ONVIF
+                        </button>
+                        <button type="button" class="camera-provider-tab" data-provider="manual" role="tab">
+                            Manual RTSP
+                        </button>
+                    </div>
+
+                    <form action="/api/cameras" method="POST" id="add-camera-form">
+                        <input type="hidden" name="addSource" id="add-source" value="unifi-protect">
+                        <input type="hidden" name="username" id="add-username" value="">
+                        <input type="hidden" name="password" id="add-password" value="">
+
+                        <div class="camera-provider-panel" data-provider-panel="unifi-protect">
+                            <p class="field-hint">Log in to your Protect controller. Saved login is used when fields are empty (see Options).</p>
+                            <div class="provider-creds">
+                                <label for="unifi-host">Controller IP / hostname</label>
+                                <input type="text" id="unifi-host" placeholder="192.168.x.x" autocomplete="off"
+                                    value="<%= typeof protectController !== 'undefined' && protectController ? protectController.host : '' %>">
+                                <label for="unifi-user">Local user</label>
+                                <input type="text" id="unifi-user" placeholder="admin" autocomplete="username"
+                                    value="<%= typeof protectController !== 'undefined' && protectController ? protectController.username : '' %>">
+                                <label for="unifi-pass">Password</label>
+                                <input type="password" id="unifi-pass" placeholder="<%= typeof protectController !== 'undefined' && protectController && protectController.hasPassword ? '•••••••• (saved)' : 'password' %>" autocomplete="current-password">
+                            </div>
+                            <label class="checkbox-row">
+                                <input type="checkbox" id="unifi-save-controller" checked>
+                                Remember controller login on this bridge
+                            </label>
+                            <div class="provider-actions provider-actions--wrap">
+                                <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="unifi-protect">
+                                    List cameras
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="unifi-import-all-btn">
+                                    Import all new
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="unifi-sync-existing-btn">
+                                    Link existing cameras
+                                </button>
+                            </div>
+                            <p class="field-hint">Import all adds every Protect camera not yet in the bridge. Link existing matches by name or RTSP alias.</p>
+                        </div>
+
+                        <div class="camera-provider-panel hidden" data-provider-panel="reolink">
+                            <p class="field-hint">Camera or NVR IP with Reolink credentials. RTSP path is built as <code>h264Preview_XX_main</code>.</p>
+                            <div class="provider-creds">
+                                <label for="reolink-host">Host IP</label>
+                                <input type="text" id="reolink-host" placeholder="192.168.x.x" autocomplete="off">
+                                <label for="reolink-user">Username</label>
+                                <input type="text" id="reolink-user" placeholder="admin" autocomplete="username">
+                                <label for="reolink-pass">Password</label>
+                                <input type="password" id="reolink-pass" placeholder="password" autocomplete="current-password">
+                            </div>
+                            <div class="provider-actions">
+                                <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="reolink">
+                                    Connect
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="camera-provider-panel hidden" data-provider-panel="tapo-sonoff">
+                            <p class="field-hint">Camera IP + <strong>Camera Account</strong> from the Tapo/Sonoff app (Advanced). ONVIF port <strong>2020</strong>.</p>
+                            <div class="provider-creds">
+                                <label for="tapo-host">Camera IP</label>
+                                <input type="text" id="tapo-host" placeholder="192.168.x.x" autocomplete="off">
+                                <label for="tapo-user">Camera Account username</label>
+                                <input type="text" id="tapo-user" placeholder="admin" autocomplete="username">
+                                <label for="tapo-pass">Camera Account password</label>
+                                <input type="password" id="tapo-pass" placeholder="password" autocomplete="current-password">
+                            </div>
+                            <div class="provider-actions">
+                                <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="tapo-sonoff">
+                                    Connect
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="camera-provider-panel hidden" data-provider-panel="onvif">
+                            <p class="field-hint">WS-Discovery on UDP 3702 — finds cameras on the same LAN.</p>
+                            <div class="provider-creds">
+                                <label for="onvif-scan-user">ONVIF username</label>
+                                <input type="text" id="onvif-scan-user" placeholder="admin" autocomplete="username">
+                                <label for="onvif-scan-pass">ONVIF password</label>
+                                <input type="password" id="onvif-scan-pass" placeholder="password" autocomplete="current-password">
+                            </div>
+                            <div class="provider-actions">
+                                <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="onvif">
+                                    Scan LAN (5s)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="camera-provider-panel hidden" data-provider-panel="manual">
+                            <p class="field-hint">Paste an RTSP or RTSPS URL from your camera or NVR documentation.</p>
+                        </div>
+
+                        <p id="provider-discover-status" class="field-hint provider-discover-status hidden"></p>
+                        <div id="provider-discover-results" class="provider-discover-results hidden"></div>
+
+                        <div class="add-camera-details">
+                            <label for="add-name">Camera Name</label>
+                            <input type="text" id="add-name" name="name" placeholder="Front Door" required>
+
+                            <label for="add-rtsp">Stream URL (RTSP / RTSPS)</label>
+                            <input type="text" id="add-rtsp" name="rtspUrl"
+                                placeholder="Filled by plugin or paste manually" required>
+                            <p id="add-rtsp-hint" class="field-hint">Select a camera above or paste a stream URL for Manual RTSP.</p>
+                        </div>
+
+                        <details class="advanced-toggle">
+                            <summary>Advanced options</summary>
+                            <div class="advanced-options">
+                                <label for="add-codec">Video Codec (Optional)</label>
+                                <select id="add-codec" name="codec">
+                                    <option value="">Auto Detect</option>
+                                    <option value="h264">H.264</option>
+                                    <option value="h265">H.265</option>
+                                </select>
+
+                                <%- include('motion-options', {
+                                    idPrefix: 'add',
+                                    selectedMotion: 'auto',
+                                }) %>
+                            </div>
+                        </details>
+
+                        <button type="submit" class="btn">Add Camera</button>
+                        <% if (isCommissioned) { %>
+                            <p class="field-hint" style="margin-top: 12px;">
+                                The bridge restarts automatically after adding a camera so SmartThings can
+                                pick up the new endpoint. If it still does not appear, remove and re-pair
+                                the bridge once (cameras in this dashboard are kept).
+                            </p>
+                        <% } %>
+                    </form>
+                </div>

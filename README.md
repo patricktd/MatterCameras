@@ -1,6 +1,6 @@
 # MatterCameras
 
-> **Beta (pre-1.0)** — current version in `package.json` (e.g. `0.3.1-beta`). Bumped +0.0.1 on each deploy; verify server with `curl http://<host>:3202/api/version`.
+> **Beta (pre-1.0)** — current version **`0.3.10-beta`** on production (`192.168.1.50`). Bumped +0.0.1 on each deploy; verify with `curl http://<host>:3202/api/version`.
 
 Bridge RTSP/ONVIF cameras into **Matter 1.5 Camera** devices for SmartThings (Aeotec Hub v2) and other Matter controllers.
 
@@ -64,8 +64,9 @@ App-only on host: `./scripts/setup.sh --dev` and `docker compose up -d go2rtc`.
 - [x] Matter 1.5 Camera device type (bridged)
 - [x] Live view WebRTC (iOS + Android SmartThings app)
 - [x] JPEG snapshots and card preview
-- [x] Motion events (Zone Management + OccupancySensing + RTSP frame-diff)
-- [ ] ONVIF auto-discovery
+- [x] Motion events (Zone Management + OccupancySensing + RTSP frame-diff or ONVIF PullPoint)
+- [x] ONVIF WS-Discovery (Web UI scan + REST API)
+- [ ] ONVIF periodic auto-discovery (background rescan)
 - [ ] Cloud recording (Push AV Stream Transport — see `docs/MATTER-CAMERA.md`)
 
 ## Repository

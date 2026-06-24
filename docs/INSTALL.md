@@ -57,10 +57,28 @@ Ensure nothing else on the host binds these ports before starting.
 
 ## Add a camera
 
+### Option A — ONVIF scan (recommended when cameras support ONVIF)
+
+1. Web UI → **+ Add Camera**
+2. Enter **ONVIF username** and **password** (shared across discovered devices)
+3. Click **Scan LAN (5s)** — WS-Discovery on UDP 3702 (same subnet as the bridge host)
+4. Click **Use** on a discovered camera — the form fills with name, RTSP URL, and ONVIF URL
+5. Review and click **Add Camera**
+
+If ONVIF is on a non-standard port, set **ONVIF device URL** under Advanced after scan.
+
+### Option B — manual RTSP URL
+
 1. Web UI → **Add camera**
 2. Name + RTSP URL, e.g. `rtsp://user:pass@192.168.1.100:554/stream1`
 3. Save — the bridge registers the stream in go2rtc and exposes a new bridged Matter camera endpoint.
 4. In SmartThings, open the bridge device and confirm the new camera appears (may take a short hub sync).
+
+**Motion (Advanced):** default **Frame diff** works on any RTSP. Choose **ONVIF events** if the camera supports ONVIF motion (lower CPU).
+
+### More than 4 cameras on SmartThings
+
+Live view works for all bridged cameras. The SmartThings app only lets you pick **4 cameras** for cloud monitoring **card previews** — cameras outside that selection may show empty cards. Change the selection in **Home Monitor → Cameras**.
 
 ### No camera yet?
 

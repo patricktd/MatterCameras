@@ -4,12 +4,25 @@ import fs from 'fs';
 import path from 'path';
 import { SETTINGS_FILE } from '../config/paths.js';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface AppSettings {}
+export interface ProtectControllerSettings {
+    host: string;
+    username: string;
+    password: string;
+}
+
+export interface AppSettings {
+    protectController?: ProtectControllerSettings;
+}
 
 type SettingsData = { settings: AppSettings };
 
 const defaultData: SettingsData = { settings: {} };
+
+export interface ProtectControllerPublic {
+    host: string;
+    username: string;
+    hasPassword: boolean;
+}
 
 export class SettingsService {
     private db: Low<SettingsData>;
@@ -31,6 +44,41 @@ export class SettingsService {
 
     getSettings(): AppSettings {
         return { ...this.db.data!.settings };
+    }
+
+    getProtectController(): ProtectControllerSettings | undefined {
+        const cfg = this.db.data?.settings.protectController;
+        if (!cfg?.host || !cfg.username) return undefined;
+        return { ...cfg };
+    }
+
+    getProtectControllerPublic(): ProtectControllerPublic | undefined {
+        const cfg = this.getProtectController();
+        if (!cfg) return undefined;
+        return {
+            host: cfg.host,
+            username: cfg.username,
+            hasPassword: Boolean(cfg.password),
+        };
+    }
+
+    async setProtectController(cfg: ProtectControllerSettings): Promise<void> {
+        const host = cfg.host.trim();
+        const username = cfg.username.trim();
+        if (!host || !username) {
+            throw new Error('host and username are required');
+        }
+        this.db.data!.settings.protectController = {
+            host,
+            username,
+            password: cfg.password,
+        };
+        await this.db.write();
+    }
+
+    async clearProtectController(): Promise<void> {
+        delete this.db.data!.settings.protectController;
+        await this.db.write();
     }
 }
 

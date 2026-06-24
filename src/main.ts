@@ -46,7 +46,7 @@ async function main() {
 
     // Motion polls go2rtc JPEG frames — must run only after every stream is registered.
     for (const cam of cameras) {
-        bridge.startMotionDetection(cam.id);
+        bridge.startMotionDetection(cam);
     }
     console.log(`Motion detection active for ${cameras.length} camera(s)`);
 

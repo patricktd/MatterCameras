@@ -38,10 +38,26 @@ rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
   --exclude data/cameras.json \
   --exclude data/config.json \
   --exclude data/go2rtc.yaml \
+  --exclude data/settings.json \
   --exclude '*.expect' \
   --exclude .env \
   --exclude deploy.env \
+  --exclude .analysis \
+  --exclude .cursor/ST-beta \
+  --exclude .cursor/ST-main \
   "${ROOT}/" "${USER}@${HOST}:${DEST}/"
+
+# Host bind-mounts ./dist over the image — sync compiled JS so runtime matches the build.
+if [ ! -d "${ROOT}/dist" ]; then
+    echo "ERROR: ${ROOT}/dist not found. Run 'npm run build' first." >&2
+    exit 1
+fi
+
+rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
+  --exclude test \
+  --exclude '.DS_Store' \
+  --exclude '._*' \
+  "${ROOT}/dist/" "${USER}@${HOST}:${DEST}/dist/"
 
 echo "==> Building and starting containers..."
 ssh "${USER}@${HOST}" bash -s <<EOF
@@ -51,6 +67,7 @@ mkdir -p data
 [ -f data/cameras.json ] || echo '{"cameras":[]}' > data/cameras.json
 docker compose down 2>/dev/null || true
 docker compose up --build -d
+docker compose restart app
 docker compose ps
 echo ""
 echo "Web UI:  http://${HOST}:3202"

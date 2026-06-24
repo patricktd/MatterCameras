@@ -11,7 +11,8 @@ Bridge device type: **Camera `0x0142`** (bridged endpoint per RTSP camera).
 | Snapshot / card preview | Camera AV Stream Management | OK | OK |
 | Image flip / rotation | ImageControl (AV cluster) | OK | OK — set in device settings; re-open live view after change |
 | **Notification image** | `CaptureSnapshot` | OK | **OK** — JPEG appears in push notification |
-| Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | RTSP frame-diff | Hub reprofile (`softwareVersion` 301) or 61.x beta drivers |
+| Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | frame-diff or ONVIF | Hub reprofile (`softwareVersion` 301+) or 61.x drivers |
+| ONVIF discovery | REST + Web UI | WS-Discovery UDP 3702 | Requires Docker host networking |
 | Cloud recording plan | **Push AV Stream Transport** `0x0555` | **Not implemented** | UI shows plan; **no clips upload** |
 
 ---
@@ -58,9 +59,28 @@ Matter 1.5 motion for routines uses the **Zone Management** cluster, not a vendo
 - Default trigger: 10 s initial, 5 s augmentation, 120 s max, 30 s blind
 - Events: `ZoneTriggered` (reason: Motion), `ZoneStopped`
 
-### Motion source (generic RTSP)
+### Motion source (generic RTSP — default)
 
-`MotionDetectionService` polls a low-res JPEG from go2rtc every 2 s and compares consecutive frames (byte delta). No UniFi/ONVIF-specific code — works on any RTSP URL go2rtc can ingest.
+`motionSource: frame-diff` or unset. Provider `FrameDiffMotionProvider` polls JPEG from go2rtc (~3 s).
+
+### Motion source (auto — recommended)
+
+`motionSource: auto` tries, in order: **UniFi Protect** → **Reolink native** → **ONVIF** → **frame-diff**.
+Configure vendor fields in Web UI Advanced options. ONVIF scan pre-fills `manufacturer` and suggests auto.
+
+### Motion source (ONVIF)
+
+`motionSource: onvif` or auto fallback. `OnvifMotionProvider` with **30s hold debounce** (Tapo/Sonoff CellMotion).
+Optional `onvifUrl` (Tapo often port **2020**).
+
+### Motion source (Reolink / UniFi)
+
+- **Reolink:** `reolink-native` or auto when `manufacturer: Reolink`; optional `reolinkChannel`.
+- **UniFi:** `unifi-protect` or auto when `protectHost` + `protectCameraId` set.
+
+**Architecture:** [MOTION-PROVIDERS.md](./MOTION-PROVIDERS.md).
+
+Inspired by [matter-onvif-bridge](https://github.com/iamjairo/matter-onvif-bridge).
 
 When motion is detected, the bridge emits `ZoneTriggered` / `ZoneStopped` and updates **OccupancySensing**. SmartThings matter-switch maps occupancy to **motionSensor**, so routines use:
 
@@ -71,7 +91,9 @@ When motion is detected, the bridge emits `ZoneTriggered` / `ZoneStopped` and up
 ### Logs to watch
 
 ```
-Motion detector start camera=cam-…
+Frame diff motion watching camera=cam-…    # frame-diff provider
+ONVIF events motion watching camera=cam-…  # onvif provider
+ONVIF motion failed … falling back to frame-diff
 ZoneTriggered camera=cam-… zone=1
 ZoneStopped camera=cam-… zone=1 reason=0
 ```
@@ -79,6 +101,27 @@ ZoneStopped camera=cam-… zone=1 reason=0
 ### After deploy
 
 Existing paired cameras may need a **hub refresh** (or remove/re-add one camera) so SmartThings discovers the new Zone Management cluster on the endpoint.
+
+---
+
+## ONVIF WS-Discovery (add cameras)
+
+Web UI: **Add Camera** → **ONVIF network scan** → enter username/password → **Use** on a discovered device. Fills name, RTSP URL, and ONVIF URL; sets motion to ONVIF when the camera reports motion events.
+
+REST API (same LAN as the bridge host; requires UDP 3702 multicast — works with Docker `network_mode: host`):
+
+```bash
+# Scan (~5 s)
+curl -s -X POST http://<host>:3202/api/onvif/discover \
+  -H 'Content-Type: application/json' -d '{"timeoutMs":5000}'
+
+# Resolve RTSP URL for one device
+curl -s -X POST http://<host>:3202/api/onvif/resolve \
+  -H 'Content-Type: application/json' \
+  -d '{"hostname":"192.168.1.10","port":80,"username":"admin","password":"secret"}'
+```
+
+**Files:** `src/onvif/discovery.ts`, `src/onvif/connectCamera.ts`
 
 ---
 

@@ -27,7 +27,7 @@ cp deploy.env.example deploy.env
 
 ## Full deploy
 
-Rebuilds images and syncs the full tree (excluding runtime data). **Bumps `package.json` patch by +0.0.1** before build:
+Rebuilds images, syncs the full tree **and `dist/`** (required — see below). **Bumps `package.json` patch by +0.0.1** before build:
 
 ```bash
 npm run deploy
@@ -35,9 +35,11 @@ npm run deploy
 ./scripts/deploy.sh
 ```
 
+Use full deploy when adding or upgrading **npm dependencies** (e.g. `onvif`) — the Docker image runs `npm ci` at build time.
+
 ## Quick deploy (code-only)
 
-Bumps version, builds TypeScript, syncs `dist/`, `views/`, `package.json`, restarts **app**:
+Bumps version, builds TypeScript, syncs `dist/`, `views/`, `public/`, `package.json`, restarts **app**:
 
 ```bash
 npm run quick-deploy
@@ -46,6 +48,15 @@ npm run quick-deploy
 ```
 
 Pass `--no-bump` to skip the version increment (e.g. when `npm run quick-deploy` already bumped).
+
+Both scripts end with **`docker compose restart app`** so `/api/version` reflects the bind-mounted `package.json` (read once at Node startup).
+
+## `dist/` bind-mount (important)
+
+`docker-compose.yml` mounts `./dist:/app/dist:ro`. The running container always executes **host** `dist/`, not only the copy baked into the image.
+
+- Both `deploy.sh` and `quick-deploy.sh` rsync `dist/` after local `npm run build`.
+- Symptom if skipped: new API routes 404 (`Cannot POST /api/onvif/discover`) even after a successful image rebuild.
 
 ## Verify deployed version
 

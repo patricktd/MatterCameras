@@ -1,0 +1,55 @@
+<% const motionValue = typeof selectedMotion !== 'undefined' ? selectedMotion : 'auto'; %>
+<div class="motion-options-root" data-motion-root="<%= idPrefix %>">
+    <label for="<%= idPrefix %>-motion">Motion detection</label>
+    <select id="<%= idPrefix %>-motion" name="motionSource" class="motion-source-select">
+        <option value="auto" <%= motionValue === 'auto' ? 'selected' : '' %>>Auto (recommended)</option>
+        <option value="unifi-protect" <%= motionValue === 'unifi-protect' ? 'selected' : '' %>>UniFi Protect</option>
+        <option value="reolink-native" <%= motionValue === 'reolink-native' ? 'selected' : '' %>>Reolink native</option>
+        <option value="onvif" <%= motionValue === 'onvif' ? 'selected' : '' %>>ONVIF events</option>
+        <option value="frame-diff" <%= motionValue === 'frame-diff' ? 'selected' : '' %>>Frame diff (any RTSP)</option>
+    </select>
+
+    <p class="field-hint motion-hint" data-show-for="auto">
+        Tries UniFi Protect → Reolink → ONVIF → frame diff. Fill only the sections that apply to this camera.
+    </p>
+    <p class="field-hint motion-hint" data-show-for="frame-diff">
+        Compares low-res JPEG frames from the stream. No vendor settings required.
+    </p>
+
+    <div class="motion-field-group" data-show-for="unifi-protect auto">
+        <p class="motion-group-label">UniFi Protect</p>
+        <label for="<%= idPrefix %>-protect-host">Controller IP / hostname</label>
+        <input type="text" id="<%= idPrefix %>-protect-host" name="protectHost"
+            value="<%= typeof protectHost !== 'undefined' ? protectHost : '' %>"
+            placeholder="192.168.x.x">
+
+        <label for="<%= idPrefix %>-protect-cam">Protect camera id</label>
+        <input type="text" id="<%= idPrefix %>-protect-cam" name="protectCameraId"
+            value="<%= typeof protectCameraId !== 'undefined' ? protectCameraId : '' %>"
+            placeholder="24-char id from Protect UI">
+        <p class="field-hint">Protect app → camera → copy id from URL or device settings.</p>
+    </div>
+
+    <div class="motion-field-group" data-show-for="reolink-native auto">
+        <p class="motion-group-label">Reolink</p>
+        <label for="<%= idPrefix %>-reolink-ch">Channel (NVR)</label>
+        <input type="number" id="<%= idPrefix %>-reolink-ch" name="reolinkChannel" min="0" max="31"
+            value="<%= typeof reolinkChannel !== 'undefined' && reolinkChannel !== null ? reolinkChannel : 0 %>">
+        <p class="field-hint">Use 0 for standalone cameras. RTSP credentials above are used for api.cgi.</p>
+    </div>
+
+    <div class="motion-field-group" data-show-for="onvif auto">
+        <p class="motion-group-label">ONVIF</p>
+        <label for="<%= idPrefix %>-onvif">Device URL</label>
+        <input type="text" id="<%= idPrefix %>-onvif" name="onvifUrl"
+            value="<%= typeof onvifUrl !== 'undefined' ? onvifUrl : '' %>"
+            placeholder="http://192.168.x.x:2020/onvif/device_service">
+        <p class="field-hint">Tapo/Sonoff often use port 2020. Leave blank to use the RTSP host on port 80.</p>
+    </div>
+
+    <input type="hidden" id="<%= idPrefix %>-manufacturer" name="manufacturer"
+        value="<%= typeof manufacturer !== 'undefined' ? manufacturer : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-model" name="model"
+        value="<%= typeof model !== 'undefined' ? model : '' %>">
+    <p id="<%= idPrefix %>-motion-hint" class="field-hint motion-suggest-hint" data-show-for="auto onvif reolink-native unifi-protect"></p>
+</div>

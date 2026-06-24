@@ -1,6 +1,6 @@
 {
   "name": "matter-cameras",
-  "version": "0.3.7-beta",
+  "version": "0.3.15-beta",
   "description": "Bridge RTSP/ONVIF streams to Matter 1.5 cameras for SmartThings",
   "type": "module",
   "main": "dist/main.js",
@@ -12,7 +12,7 @@
     "setup": "bash scripts/setup.sh",
     "deploy": "node scripts/bump-deploy-version.mjs && npm run build && bash scripts/deploy.sh --no-bump",
     "quick-deploy": "node scripts/bump-deploy-version.mjs && npm run build && bash scripts/quick-deploy.sh --no-bump",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --import tsx src/streaming/imageTransform.test.ts && node --import tsx src/streaming/resolveOnvifTarget.test.ts && node --import tsx src/utils/redactRtspUrl.test.ts && node --import tsx src/onvif/parseOnvifMotionEvent.test.ts && node --import tsx src/motion/suggestMotionProvider.test.ts && node --import tsx src/motion/resolveMotionProvider.test.ts && node --import tsx src/cameraProviders/buildProtectRtsp.test.ts"
   },
   "keywords": [
     "matter",
@@ -27,13 +27,15 @@
   "dependencies": {
     "@matter/general": "^0.17.1",
     "@matter/main": "^0.17.1",
-    "@matter/nodejs": "^0.17.1",
     "@matter/node": "^0.17.1",
+    "@matter/nodejs": "^0.17.1",
     "@matter/types": "^0.17.1",
     "@project-chip/matter.js": "^0.17.1",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
-    "lowdb": "^7.0.1"
+    "lowdb": "^7.0.1",
+    "onvif": "^0.8.1",
+    "unifi-protect": "^4.29.0"
   },
   "devDependencies": {
     "@types/ejs": "^3.1.5",

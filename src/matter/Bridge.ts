@@ -12,11 +12,18 @@ import { streamContext } from './behaviors/streamContext.js';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
 import { BridgedCameraDevice, bridgedCameraOptions } from './devices/BridgedCameraDevice.js';
 import { BasicInformationServer } from '@matter/main/behaviors/basic-information';
+import { DescriptorServer } from '@matter/main/behaviors/descriptor';
 import { getMatterSoftwareVersion, getMatterSoftwareVersionString } from '../config/version.js';
 import { getMatterStoragePath, wipeMatterStorage } from './matterStorage.js';
+import { EndpointNumber } from '@matter/types';
 
 /** Matter Aggregator (bridge) device type — must match mDNS commissioning advert. */
 const BRIDGE_DEVICE_TYPE = DeviceTypeId(0x0e);
+
+/** Legacy placeholder ids from an abandoned slot-pool experiment — must not stay on the bridge. */
+function isLegacySlotEndpointId(id: string): boolean {
+    return /^cam-slot-\d{2}$/.test(id);
+}
 
 export class MatterBridge {
     private server?: ServerNode;
@@ -46,7 +53,6 @@ export class MatterBridge {
             },
             network: {
                 port: appConfig.matterPort,
-                // Bind all interfaces; mDNS uses MATTER_NETWORK_INTERFACE_* to pick LAN IP
                 listeningAddressIpv4: appConfig.matterBindHost,
                 tcp: { incoming: true, outgoing: true },
             },
@@ -72,12 +78,13 @@ export class MatterBridge {
         if (this.started) return;
 
         await this.server.start();
+        await this.#purgeLegacyPlaceholderEndpoints();
         this.started = true;
         await this.#announceStructureToHub();
         console.log(`Matter Bridge online at ${appConfig.matterHost}:${appConfig.matterPort}`);
     }
 
-    /** Bump softwareVersion + log partsList so SmartThings re-discovers bridged cameras. */
+    /** Bump softwareVersion + re-report PartsList so hubs re-discover bridged cameras. */
     async notifyHubStructureChange() {
         await this.#announceStructureToHub();
     }
@@ -94,18 +101,42 @@ export class MatterBridge {
             for (const endpoint of this.cameraEndpoints.values()) {
                 await endpoint.setStateOf(BridgedDeviceBasicInformationServer, versionState);
             }
+
+            await this.aggregator.setStateOf(DescriptorServer, {
+                partsList: this.#aggregatorPartNumbers(),
+            });
         } catch (error) {
             console.warn(`Bridge structure announce failed: ${error}`);
         }
 
-        const partNumbers = [...this.aggregator.parts]
-            .map(part => (part.lifecycle.hasNumber ? part.number : undefined))
-            .filter(n => n !== undefined)
-            .sort((a, b) => Number(a) - Number(b));
-
+        const partNumbers = this.#aggregatorPartNumbers();
         const msg = `Bridge structure: ${this.cameraEndpoints.size} camera(s), `
             + `softwareVersion=${version}, Matter endpoints=[${partNumbers.join(', ')}]`;
         console.log(msg);
+    }
+
+    #aggregatorPartNumbers(): EndpointNumber[] {
+        if (!this.aggregator) return [];
+        return [...this.aggregator.parts]
+            .map(part => (part.lifecycle.hasNumber ? part.number : undefined))
+            .filter(n => n !== undefined)
+            .sort((a, b) => Number(a) - Number(b)) as EndpointNumber[];
+    }
+
+    async #purgeLegacyPlaceholderEndpoints() {
+        if (!this.aggregator) return;
+
+        const placeholders = [...this.aggregator.parts]
+            .filter(part => isLegacySlotEndpointId(String(part.id)));
+
+        for (const endpoint of placeholders) {
+            console.log(`Removing legacy placeholder endpoint: ${endpoint.id}`);
+            await endpoint.delete();
+        }
+
+        if (placeholders.length > 0) {
+            console.log(`Purged ${placeholders.length} unused cam-slot placeholder(s) from Matter storage`);
+        }
     }
 
     #restoreCamerasFromStorage() {
@@ -113,7 +144,7 @@ export class MatterBridge {
 
         for (const child of this.aggregator.parts) {
             const id = String(child.id);
-            if (id.startsWith('cam-')) {
+            if (id.startsWith('cam-') && !isLegacySlotEndpointId(id)) {
                 this.cameraEndpoints.set(id, child);
                 console.log(`Restored bridged camera from storage: ${id}`);
             }
@@ -186,9 +217,9 @@ export class MatterBridge {
         });
     }
 
-    /** Start RTSP motion polling — call only after go2rtc stream is registered for this camera. */
-    startMotionDetection(cameraId: string): void {
-        this.motionDetection.startCamera(cameraId, this.go2rtc);
+    /** Start motion detection — call only after go2rtc stream is registered for this camera. */
+    startMotionDetection(camera: Camera): void {
+        this.motionDetection.startCamera(camera, this.go2rtc);
     }
 
     async removeCamera(id: string) {
@@ -225,8 +256,6 @@ export class MatterBridge {
             console.warn(`Matter bridge close failed: ${error}`);
         }
 
-        // matter.js erase() clears fabrics but leaves client peer files on disk; a Docker
-        // restart then loads corrupt storage (FabricNotFoundError). Wipe the directory instead.
         const storagePath = getMatterStoragePath();
         console.log(`Removing Matter storage at ${storagePath}...`);
         await wipeMatterStorage();

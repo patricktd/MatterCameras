@@ -10,3 +10,6 @@ deploy.env
 deploy.tar.gz
 deploy.expect
 *.expect
+.analysis/
+.cursor/ST-beta/
+.cursor/ST-main/

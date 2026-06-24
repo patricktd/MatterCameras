@@ -14,6 +14,30 @@
     </div>
 
     <div class="card options-page">
+        <h2>UniFi Protect controller</h2>
+        <p class="field-hint" style="margin-top: 0;">
+            Saved once per bridge — used for listing cameras, bulk import, and motion on UniFi cameras
+            without repeating credentials in each camera record.
+        </p>
+        <form id="protect-controller-form" class="provider-creds options-creds">
+            <label for="opt-protect-host">Controller IP / hostname</label>
+            <input type="text" id="opt-protect-host" name="host" placeholder="192.168.x.x"
+                value="<%= typeof protectController !== 'undefined' && protectController ? protectController.host : '' %>">
+            <label for="opt-protect-user">Local user</label>
+            <input type="text" id="opt-protect-user" name="username" placeholder="admin"
+                value="<%= typeof protectController !== 'undefined' && protectController ? protectController.username : '' %>">
+            <label for="opt-protect-pass">Password</label>
+            <input type="password" id="opt-protect-pass" name="password"
+                placeholder="<%= typeof protectController !== 'undefined' && protectController && protectController.hasPassword ? 'Leave blank to keep saved password' : 'password' %>">
+        </form>
+        <div class="options-actions">
+            <button type="button" class="btn btn-sm" id="save-protect-controller-btn">Save controller login</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="clear-protect-controller-btn">Clear saved login</button>
+        </div>
+        <p id="protect-controller-status" class="field-hint"></p>
+    </div>
+
+    <div class="card options-page">
         <h2>Bridge</h2>
         <p class="field-hint" style="margin-top: 0;">
             Restart reloads all cameras and refreshes the Matter parts list for SmartThings.
@@ -26,3 +50,4 @@
     </div>
 
     <%- include('partials/footer') %>
+    <script src="/js/options.js"></script>

@@ -65,7 +65,7 @@ rsync -rlvz --omit-dir-times --no-perms --no-owner --no-group \
 rsync -rlvz --omit-dir-times --no-perms --no-owner --no-group \
   "${ROOT}/package.json" "${USER_NAME}@${HOST}:${DEST}/package.json"
 
-ssh "${USER_NAME}@${HOST}" "cd ${DEST} && docker compose up -d app && sleep 3 && docker compose ps app"
+ssh "${USER_NAME}@${HOST}" "cd ${DEST} && docker compose up -d app && docker compose restart app && sleep 4 && docker compose ps app"
 
 echo "==> Quick deploy complete (v${DEPLOY_VERSION})."
 echo "    Verify: curl -s http://${HOST}:3202/api/version"

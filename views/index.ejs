@@ -5,6 +5,15 @@
 
     <div class="main-grid">
 
+        <% if (cameras.length > 4) { %>
+            <div class="notice-banner notice-banner--warning main-grid-full">
+                <strong>SmartThings preview limit:</strong> the mobile app lets you pick up to
+                <strong>4 cameras</strong> for cloud monitoring card previews. Live view works for all
+                <%= cameras.length %> cameras; cameras outside your selection may show a stale or empty card.
+                Change the selection in SmartThings → Home Monitor → Cameras.
+            </div>
+        <% } %>
+
         <div>
             <div class="card">
                 <div class="card-header-row card-header-row--actions">
@@ -13,43 +22,12 @@
                     </button>
                 </div>
 
-                <div id="add-camera-panel" class="collapsible-panel <%= addFormOpen ? '' : 'hidden' %>">
-                    <form action="/api/cameras" method="POST">
-                        <label for="add-name">Camera Name</label>
-                        <input type="text" id="add-name" name="name" placeholder="Front Door" required>
-
-                        <label for="add-rtsp">RTSP / ONVIF Stream URL</label>
-                        <input type="text" id="add-rtsp" name="rtspUrl"
-                            placeholder="rtsp://user:password@192.168.x.x:554/stream" required>
-                        <p class="field-hint">Ask your camera manufacturer for the RTSP URL, or check your NVR settings.</p>
-
-                        <details class="advanced-toggle">
-                            <summary>Advanced options</summary>
-                            <div class="advanced-options">
-                                <label for="add-codec">Video Codec (Optional)</label>
-                                <select id="add-codec" name="codec">
-                                    <option value="">Auto Detect</option>
-                                    <option value="h264">H.264</option>
-                                    <option value="h265">H.265</option>
-                                </select>
-                            </div>
-                        </details>
-
-                        <button type="submit" class="btn">Add Camera</button>
-                        <% if (isCommissioned) { %>
-                            <p class="field-hint" style="margin-top: 12px;">
-                                New cameras are exposed on the Matter bridge immediately (PartsList update).
-                                SmartThings usually picks them up within a minute; if not, open
-                                <strong>MatterCameras Bridge</strong> and pull down to refresh.
-                            </p>
-                        <% } %>
-                    </form>
-                </div>
+                <%- include('partials/add-camera-panel', { addFormOpen, isCommissioned, protectController }) %>
             </div>
 
             <% if (cameras.length === 0) { %>
                 <div class="empty-state">
-                    <p>No cameras added yet. Click <strong>+ Add Camera</strong> above and paste your stream URL to get started.</p>
+                    <p>No cameras added yet. Click <strong>+ Add Camera</strong> and pick UniFi Protect, Reolink, ONVIF, or paste an RTSP URL.</p>
                     <% if (!isCommissioned) { %>
                         <p style="font-size: 0.8rem;">Tip: pair the bridge with SmartThings first, then add your cameras.</p>
                     <% } %>
@@ -60,23 +38,35 @@
                 <% cameras.forEach(cam => { %>
                     <div class="camera-card" data-camera-id="<%= cam.id %>">
                         <div class="camera-view">
-                            <h3><%= cam.name %></h3>
-                            <p class="camera-url camera-url-truncated" title="<%= cam.rtspUrl %>">
-                                <%= cam.rtspUrl %>
-                            </p>
+                            <div class="camera-preview">
+                                <div class="camera-preview-placeholder">No signal</div>
+                                <img class="camera-preview-img" alt="<%= cam.name %> preview">
+                                <span class="camera-status-badge camera-status-badge--checking">Checking…</span>
+                            </div>
+                            <div class="camera-view-header">
+                                <h3><%= cam.name %></h3>
+                                <div class="camera-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm btn-edit">Edit</button>
+                                    <form action="/api/cameras/<%= cam.id %>/delete" method="POST" style="display:inline;"
+                                        onsubmit="return confirm('Remove camera <%= cam.name %>?');">
+                                        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                    </form>
+                                </div>
+                            </div>
+                            <% const motionLabel = (() => {
+                                const s = cam.motionSource || 'frame-diff';
+                                if (s === 'auto') return 'Motion: Auto';
+                                if (s === 'onvif') return 'Motion: ONVIF';
+                                if (s === 'reolink-native') return 'Motion: Reolink';
+                                if (s === 'unifi-protect') return 'Motion: UniFi Protect';
+                                return 'Motion: Frame diff';
+                            })(); %>
+                            <% if (cam.motionSource && cam.motionSource !== 'frame-diff') { %>
+                                <p class="camera-meta"><%= motionLabel %></p>
+                            <% } %>
                             <% if (cam.codec) { %>
                                 <p class="camera-meta">Codec: <%= cam.codec.toUpperCase() %></p>
                             <% } %>
-                            <div class="camera-actions">
-                                <button type="button" class="btn btn-secondary btn-sm btn-copy-url"
-                                    data-url="<%= cam.rtspUrl %>">Copy URL</button>
-                                <span class="copy-feedback"></span>
-                                <button type="button" class="btn btn-secondary btn-sm btn-edit">Edit</button>
-                                <form action="/api/cameras/<%= cam.id %>/delete" method="POST" style="display:inline;"
-                                    onsubmit="return confirm('Remove camera <%= cam.name %>?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">Remove</button>
-                                </form>
-                            </div>
                         </div>
 
                         <form class="camera-edit hidden" action="/api/cameras/<%= cam.id %>" method="POST">
@@ -96,11 +86,24 @@
                                         <option value="h264" <%= cam.codec === 'h264' ? 'selected' : '' %>>H.264</option>
                                         <option value="h265" <%= cam.codec === 'h265' ? 'selected' : '' %>>H.265</option>
                                     </select>
+
+                                    <%- include('partials/motion-options', {
+                                        idPrefix: 'edit-' + cam.id,
+                                        selectedMotion: cam.motionSource || 'frame-diff',
+                                        onvifUrl: cam.onvifUrl || '',
+                                        protectHost: cam.protectHost || '',
+                                        protectCameraId: cam.protectCameraId || '',
+                                        reolinkChannel: cam.reolinkChannel ?? 0,
+                                        manufacturer: cam.manufacturer || '',
+                                        model: cam.model || '',
+                                    }) %>
                                 </div>
                             </details>
 
                             <div class="camera-actions">
                                 <button type="submit" class="btn btn-sm">Save</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-duplicate"
+                                    data-source-name="<%= cam.name %>">Duplicate</button>
                                 <button type="button" class="btn btn-secondary btn-sm btn-cancel">Cancel</button>
                             </div>
                         </form>

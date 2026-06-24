@@ -56,9 +56,16 @@ export class StorageService {
         if (updates.name !== undefined) camera.name = updates.name;
         if (updates.rtspUrl !== undefined) camera.rtspUrl = updates.rtspUrl;
         if (updates.codec !== undefined) camera.codec = updates.codec || undefined;
+        if (updates.motionSource !== undefined) camera.motionSource = updates.motionSource;
         if (updates.onvifUrl !== undefined) camera.onvifUrl = updates.onvifUrl;
         if (updates.username !== undefined) camera.username = updates.username;
         if (updates.password !== undefined) camera.password = updates.password;
+        if (updates.manufacturer !== undefined) camera.manufacturer = updates.manufacturer;
+        if (updates.model !== undefined) camera.model = updates.model;
+        if (updates.reolinkChannel !== undefined) camera.reolinkChannel = updates.reolinkChannel;
+        if (updates.protectHost !== undefined) camera.protectHost = updates.protectHost;
+        if (updates.protectCameraId !== undefined) camera.protectCameraId = updates.protectCameraId;
+        if (updates.addSource !== undefined) camera.addSource = updates.addSource;
 
         await this.db.write();
         return camera;
