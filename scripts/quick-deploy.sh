@@ -22,6 +22,10 @@ for arg in "$@"; do
 done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_NODE="$ROOT"
+if command -v cygpath >/dev/null 2>&1; then
+  ROOT_NODE="$(cygpath -w "$ROOT")"
+fi
 # shellcheck source=deploy-env.sh
 source "${ROOT}/scripts/deploy-env.sh"
 load_deploy_env "${ROOT}"
@@ -31,11 +35,11 @@ USER_NAME="${DEPLOY_USER}"
 DEST="${DEPLOY_DIR}"
 
 if [ "$NO_BUMP" = false ]; then
-    node "${ROOT}/scripts/bump-deploy-version.mjs"
-    npm run build --prefix "${ROOT}"
+  node "${ROOT_NODE}/scripts/bump-deploy-version.mjs"
+  npm run build --prefix "${ROOT_NODE}"
 fi
 
-DEPLOY_VERSION="$(node -p "require('${ROOT}/package.json').version")"
+DEPLOY_VERSION="$(node -e "const fs=require('fs'); const path=require('path'); const root=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); console.log(pkg.version);" "${ROOT_NODE}")"
 echo "==> Quick deploy MatterCameras v${DEPLOY_VERSION} → ${USER_NAME}@${HOST}:${DEST}"
 
 if [ ! -d "${ROOT}/dist" ]; then
