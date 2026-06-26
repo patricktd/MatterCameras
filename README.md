@@ -1,6 +1,6 @@
 # MatterCameras
 
-> **Beta (pre-1.0)** — current version **`0.3.10-beta`** on production (`192.168.1.50`). Bumped +0.0.1 on each deploy; verify with `curl http://<host>:3202/api/version`.
+> **Beta (pre-1.0)** — version bumps +0.0.1 on each deploy. Verify with `curl http://<host>:3202/api/version`.
 
 Bridge RTSP/ONVIF cameras into **Matter 1.5 Camera** devices for SmartThings (Aeotec Hub v2) and other Matter controllers.
 
@@ -45,7 +45,6 @@ bash scripts/setup.sh --host 192.168.1.50
 | **[docs/MATTER-CAMERA.md](docs/MATTER-CAMERA.md)** | Integrators — Matter features vs SmartThings |
 | **[docs/WEBRTC-DEBUG.md](docs/WEBRTC-DEBUG.md)** | Debugging live view / ICE / TURN |
 | **[docs/DEPLOY.md](docs/DEPLOY.md)** | Maintainers — rsync deploy to production host |
-| **[docs/AGENT-CONTEXT.md](docs/AGENT-CONTEXT.md)** | AI / contributor handoff |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history and system overview |
 
 ## Development

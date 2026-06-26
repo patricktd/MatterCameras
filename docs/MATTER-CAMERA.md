@@ -198,7 +198,6 @@ CSA maintenance release adds multi-stream delivery, HEIC snapshots, and HLS/DASH
 
 | File | Role |
 |------|------|
-| `docs/AGENT-CONTEXT.md` | Full agent handoff — start here |
 | `src/matter/behaviors/MatterZoneManagementServer.ts` | Zone events for routines |
 | `src/matter/behaviors/MatterOccupancySensingServer.ts` | Routine picker `occupied` state |
 | `src/streaming/rtspMotionDetector.ts` | Generic RTSP motion |

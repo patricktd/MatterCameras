@@ -393,4 +393,4 @@ Backward compatible: `motionSource: onvif` maps to `motionProvider: onvif`.
 - Scrypted Reolink: `plugins/reolink/src/reolink-api.ts`
 - Scrypted UniFi: `plugins/unifi-protect/src/main.ts`
 - MatterCameras scaling: `docs/SCALING.md`
-- MatterCameras ONVIF: `docs/AGENT-CONTEXT.md` § ONVIF
+- MatterCameras ONVIF: `docs/MATTER-CAMERA.md` and `docs/INSTALL.md`

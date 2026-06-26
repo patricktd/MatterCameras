@@ -166,4 +166,4 @@ npm test
 
 - [MATTER-CAMERA.md](./MATTER-CAMERA.md) — Matter motion clusters
 - [SCALING.md](./SCALING.md) — multi-node limits
-- [AGENT-CONTEXT.md](./AGENT-CONTEXT.md) — deploy handoff
+- [DEPLOY.md](./DEPLOY.md) — deploy and runtime data safety

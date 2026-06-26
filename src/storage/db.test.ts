@@ -31,7 +31,7 @@ try {
     const camB: Camera = {
         id: 'cam-b',
         name: 'Doorbell',
-        rtspUrl: 'rtsp://campainha/stream',
+        rtspUrl: 'rtsp://doorbell/stream',
         motionSource: 'auto',
         protectHost: '192.168.1.30',
         protectCameraId: 'protect-b',

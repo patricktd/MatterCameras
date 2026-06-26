@@ -62,18 +62,24 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 ## [Unreleased]
 
 ### Changed
+- **Mechanical PTZ exposure** — the Matter PTZ cluster is advertised only after a successful capability probe (`ptzCapable: true`). UniFi Protect cameras are excluded. Endpoints that no longer qualify are recreated without PTZ on bridge startup (hub may still need **Recycle Matter binding** on fixed cameras to refresh SmartThings).
 - **Reolink spotlight probe** — bridged light endpoints now require an active WhiteLed hardware check (`SetWhiteLed` + `GetWhiteLed` confirmation). NVR channels without a spotlight no longer get a phantom SmartThings light. The Web UI **checkbox** is hidden automatically when the probe marks the camera as not capable (`reolinkLightCapable: false`).
 - **Windows deploy (ARM64)** — `deploy.ps1` / `quick-deploy.ps1` sync with Git `tar` + OpenSSH instead of `rsync` (MSYS2 rsync segfaults under Git Bash on ARM Windows). SSH **multiplexing** (`ControlMaster`) prompts for the password once per run. `npm run deploy` routes to the PowerShell wrappers on `win32`.
 - **Person detection vs camera motion** — the Matter camera endpoint always uses generic motion (`auto` → vendor native → ONVIF → frame diff). Person detection is only available via the optional **person presence sensor** checkbox (Reolink / UniFi Protect). Legacy `motionObjectType: person` on the camera record is migrated to the separate sensor on save.
 
 ### Fixed
-- **Reolink WhiteLed probe regression** — passive `GetWhiteLed` checks no longer toggle the spotlight on startup, dashboard load, or person-sensor saves. Active hardware verification runs only when the bridged light is enabled. Reduces RTSP/WebRTC disruption (notably on standalone cameras such as Camera A).
+- **UniFi edit form** — Reolink spotlight and NVR channel fields no longer appear inside the person-sensor section when editing UniFi Protect cameras.
+- **PTZ on non-PTZ cameras** — UniFi and other fixed cameras no longer inherit a PTZ cluster from the generic bridged camera device type.
+- **SmartThings “saved as preset” toast** — the bridge no longer updates the Matter `mptzPosition` attribute after each move (position is tracked internally for delta moves).
+- **Reolink WhiteLed probe regression** — passive `GetWhiteLed` checks no longer toggle the spotlight on startup, dashboard load, or person-sensor saves. Active hardware verification runs only when the bridged light is enabled. Reduces RTSP/WebRTC disruption on standalone Reolink cameras.
 - **Live view first-attempt failures** — `ProvideOffer` now pre-warms the go2rtc transcode for every hub offer (not only compact/Android), reducing first-open timeouts.
 - **Live view slow opens (regression)** — removed blocking ffmpeg pre-warm inside `ProvideOffer` (was adding ~8s before every hub offer after the 2-minute warm window). Pre-warm now runs in the background; startup + periodic refresh keep transcoders hot without delaying signaling.
 - **Dashboard hang on save** — the home page no longer blocks on parallel Reolink WhiteLed hardware probes (same NVR host). Probes run in the background sequentially; camera save redirects immediately after settings persist.
 - **Person presence / Reolink light checkboxes** — saving with the checkbox checked no longer drops the setting (Express submitted both hidden `false` and checkbox `true`; the parser now treats that as enabled).
 
 ### Added
+- **Mechanical PTZ (beta)** — bridged cameras expose Matter `CameraAvSettingsUserLevelManagement` (`mptzSetPosition` / `mptzRelativeMove`). **Reolink** cameras use native `PtzCtrl` (recommended for TrackMix); other ONVIF PTZ cameras use continuous/relative ONVIF moves. Test without SmartThings: `POST /api/cameras/:id/ptz/left` (also `right`, `up`, `down`, `zoom-in`, `zoom-out`) and `GET /api/cameras/:id/ptz/probe`.
+- **Person presence hold time** — Web UI option to choose how long the bridged person sensor stays active after each detection pulse (30s–5min, default **60s**). Applies to Reolink and UniFi Protect person sensors.
 - **Reset ST binding** — dashboard action recreates a camera's Matter bridged endpoints with a new `uniqueId` so SmartThings can adopt the child again after a stale hub mapping (gray timeline / no live view while snapshots work on the server).
 - **Separate bridged Reolink light** — Reolink cameras with WhiteLed support can expose an extra Matter **Dimmable Light** endpoint (`light-{cameraId}`) with on/off and brightness via `SetWhiteLed` / `GetWhiteLed` (maps to SmartThings `switch` + `switchLevel`).
 - Git sync helpers for switching machines safely: `sync.sh`, `sync.ps1`, and `sync.cmd`.
@@ -103,7 +109,6 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - **OccupancySensing** cluster on bridged cameras for SmartThings routine picker (`motionSensor` capability after hub reprofile).
 - Generic **RTSP motion detection** via go2rtc JPEG frame comparison (`MotionDetectionService`); no vendor-specific APIs.
 - `docs/MATTER-CAMERA.md` — snapshots in notifications, motion routines, and cloud recording gap analysis.
-- `docs/AGENT-CONTEXT.md` — agent handoff (deploy safety, feature matrix, known issues, log commands).
 - `matterSoftwareVersion` (301) on bridged cameras to trigger SmartThings camera reprofile after new clusters.
 - Docker bind-mount `./dist`, `./views`, and `./public` (read-only) so `quick-deploy.sh` updates running container without image rebuild.
 - SmartThings **live view (WebRTC)** on **iOS and Android** — operator confirmed 2026-06-09; **audio (Opus)** on both platforms (see `docs/WEBRTC-DEBUG.md`).
