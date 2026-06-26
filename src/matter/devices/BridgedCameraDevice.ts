@@ -9,6 +9,7 @@ import { zoneManagementDefaults } from './zoneManagementDefaults.js';
 import { occupancySensingDefaults } from './occupancySensingDefaults.js';
 import { Camera } from '../../types/index.js';
 import { getMatterSoftwareVersion, getMatterSoftwareVersionString } from '../../config/version.js';
+import { bridgedUniqueId } from '../bridgedUniqueId.js';
 
 /**
  * Matter 1.5 Camera device type (0x0142) exposed as a bridged endpoint.
@@ -31,7 +32,7 @@ export function bridgedCameraOptions(camera: Camera) {
             vendorName: 'MatterCameras',
             productName: 'RTSP Camera',
             serialNumber: camera.id,
-            uniqueId: `${camera.id}-uid`,
+            uniqueId: bridgedUniqueId(camera.id, camera.matterBindEpoch),
             hardwareVersion: 1,
             hardwareVersionString: '1.0',
             softwareVersion: getMatterSoftwareVersion(),

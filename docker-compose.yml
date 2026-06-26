@@ -48,7 +48,7 @@ services:
       - NODE_ENV=production
       - MATTER_STORAGE_PATH=/app/data/matter-storage
       - MATTER_HOST=${MATTER_HOST:-127.0.0.1}
-      - MATTER_BIND_HOST=0.0.0.0
+      - MATTER_BIND_HOST=${MATTER_BIND_HOST:-${MATTER_HOST:-127.0.0.1}}
       - MATTER_PORT=${MATTER_PORT:-5550}
       - WEB_PORT=${WEB_PORT:-3202}
       - GO2RTC_URL=${GO2RTC_URL:-http://127.0.0.1:3203}

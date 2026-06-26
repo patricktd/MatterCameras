@@ -188,6 +188,15 @@ export class MatterBridge {
         return orphans;
     }
 
+    listBridgedMatterEndpoints(): Array<{ id: string; endpointNumber?: EndpointNumber }> {
+        if (!this.aggregator) return [];
+
+        return [...this.aggregator.parts].map(part => ({
+            id: String(part.id),
+            endpointNumber: part.lifecycle.hasNumber ? part.number : undefined,
+        }));
+    }
+
     async addCamera(camera: Camera) {
         if (!this.aggregator) return;
 
@@ -358,6 +367,36 @@ export class MatterBridge {
         }
     }
 
+    /**
+     * Delete and re-create Matter bridged endpoints for a camera (same cameras.json id).
+     * Bumps uniqueId so SmartThings treats the child devices as new after a stale binding.
+     */
+    async recycleMatterBinding(camera: Camera, bindEpoch: number): Promise<void> {
+        const id = camera.id;
+        const endpoint = this.cameraEndpoints.get(id) ?? this.aggregator?.parts.get(id);
+        if (!endpoint) {
+            console.warn(`Cannot recycle Matter binding — camera ${id} not on bridge`);
+            return;
+        }
+
+        console.log(`Recycling Matter binding camera=${camera.name} (${id}) bindEpoch=${bindEpoch}`);
+        this.motionDetection.stopCamera(id);
+        this.motionDetection.stopCamera(`person-${id}`);
+        this.reolinkLight.stop(id);
+        await this.#removePersonSensor(id);
+        await this.#removeReolinkLight(id);
+        await endpoint.delete();
+        this.cameraEndpoints.delete(id);
+
+        const rebound = { ...camera, matterBindEpoch: bindEpoch };
+        await this.addCamera(rebound);
+        this.startMotionDetection(rebound);
+
+        if (this.started) {
+            await this.notifyHubStructureChange();
+        }
+    }
+
     async factoryReset() {
         if (!this.server) return;
         console.log('Initiating Matter factory reset...');
@@ -442,7 +481,9 @@ export class MatterBridge {
             return existing;
         }
 
-        const capable = await this.reolinkLight.probeCapability(camera);
+        const capable = camera.reolinkLightCapable === true
+            || (camera.reolinkLightCapable === undefined
+                && await this.reolinkLight.probePassiveCapability(camera));
         if (!capable) {
             console.log(`Reolink light unsupported camera=${camera.id} — skipping bridged light endpoint`);
             return undefined;

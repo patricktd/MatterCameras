@@ -9,7 +9,7 @@ import { setBridgeEndpointCount, appVersion } from './config/version.js';
 import { streamContext } from './matter/behaviors/streamContext.js';
 import { getMatterStoragePath, wipeMatterStorage } from './matter/matterStorage.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from './matter/personSensorConfig.js';
-import { syncReolinkLightCapability } from './web/cameraInstall.js';
+import { scheduleReolinkLightCapabilityProbes } from './web/cameraInstall.js';
 
 let staleRecoveryInProgress = false;
 
@@ -124,17 +124,16 @@ async function main() {
         );
     }
     for (const cam of cameras) {
-        const camera = cam.reolinkLightCapable === undefined
-            ? await syncReolinkLightCapability(cam)
-            : cam;
-        await bridge.addCamera(camera);
-        await bridge.go2rtc.addStream(camera.id, camera.name, camera.rtspUrl);
+        await bridge.addCamera(cam);
+        await bridge.go2rtc.addStream(cam.id, cam.name, cam.rtspUrl);
     }
     setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.go2rtc.syncAllStreams();
 
     // Warm ffmpeg H.264 transcoders so the first live view does not hit a 5s+ cold start.
     await bridge.go2rtc.prewarmAllWebRtc();
+
+    scheduleReolinkLightCapabilityProbes(storage.getCameras());
 
     // Start Matter only after cameras are on the aggregator (avoids hub seeing empty partsList).
     try {
@@ -146,6 +145,10 @@ async function main() {
         throw error;
     }
 
+    if (bridge.isCommissioned()) {
+        await bridge.notifyHubStructureChange();
+    }
+
     // Motion polls go2rtc JPEG frames — must run only after every stream is registered.
     for (const cam of cameras) {
         const camera = storage.getCamera(cam.id) ?? cam;
@@ -154,6 +157,7 @@ async function main() {
     console.log(`Motion detection active for ${cameras.length} camera(s)`);
 
     bridge.go2rtc.startPeriodicPrune();
+    bridge.go2rtc.startPeriodicPrewarm();
 }
 
 installStaleFabricRecoveryHooks();

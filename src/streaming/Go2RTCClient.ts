@@ -13,7 +13,8 @@ const logger = Logger.get('Go2RTCClient');
 const WS_ICE_GATHER_MS = 6_000;
 const WS_ICE_QUIET_MS = 1_000;
 const WEBRTC_EXCHANGE_TIMEOUT_MS = 15_000;
-const PREWARM_MAX_AGE_MS = 120_000;
+const PREWARM_MAX_AGE_MS = 30 * 60_000;
+const PREWARM_REFRESH_INTERVAL_MS = 15 * 60_000;
 
 export interface Go2RtcIceServer {
     urls: string[];
@@ -45,6 +46,7 @@ export class Go2RTCClient {
     private readonly compactHubOfferAt = new Map<string, number>();
     private readonly imageTransforms = new Map<string, ImageTransform>();
     private pruneTimer?: ReturnType<typeof setInterval>;
+    private prewarmTimer?: ReturnType<typeof setInterval>;
 
     private static readonly COMPACT_HUB_RECYCLE_MS = 120_000;
 
@@ -177,11 +179,44 @@ export class Go2RTCClient {
 
     /** Warm ffmpeg if the hub has not opened live view recently (avoids first-attempt timeouts). */
     async prewarmWebRtcIfStale(streamId: string): Promise<void> {
-        const last = this.prewarmAt.get(streamId) ?? 0;
-        if (Date.now() - last < PREWARM_MAX_AGE_MS) {
+        if (await this.isWebRtcTranscodeWarm(streamId)) {
             return;
         }
         await this.prewarmWebRtc(streamId);
+    }
+
+    /** True when a recent prewarm or an active go2rtc ffmpeg producer exists for the WebRTC stream. */
+    async isWebRtcTranscodeWarm(streamId: string): Promise<boolean> {
+        const last = this.prewarmAt.get(streamId) ?? 0;
+        if (Date.now() - last < PREWARM_MAX_AGE_MS) {
+            return true;
+        }
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/streams`, { signal: AbortSignal.timeout(3_000) });
+            if (!response.ok) return false;
+            const body = await response.json() as Record<string, { producers?: unknown[] }>;
+            const producers = body[this.webrtcStreamName(streamId)]?.producers;
+            if (producers && producers.length > 0) {
+                this.prewarmAt.set(streamId, Date.now());
+                return true;
+            }
+        } catch {
+            // fall through to cold prewarm
+        }
+
+        return false;
+    }
+
+    /** Keep ffmpeg transcoders warm without blocking hub live-view signaling. */
+    startPeriodicPrewarm(intervalMs = PREWARM_REFRESH_INTERVAL_MS): void {
+        if (this.prewarmTimer) return;
+
+        this.prewarmTimer = setInterval(() => {
+            void this.prewarmAllWebRtc();
+        }, intervalMs);
+
+        logger.info(`go2rtc WebRTC pre-warm scheduled every ${Math.round(intervalMs / 1000)}s`);
     }
 
     /** Drop an active WebRTC consumer/ffmpeg producer before a hub retry on the same camera. */

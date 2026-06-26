@@ -222,7 +222,7 @@ function updatePairingUi(data) {
 
     if (status) {
         status.hidden = false;
-        status.textContent = 'Pairing code updated. Scan the new QR or enter the new manual code in SmartThings.';
+        status.textContent = 'Pairing code updated. Scan the new QR or enter the new manual code.';
     }
 }
 

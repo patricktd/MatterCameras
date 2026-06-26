@@ -67,9 +67,14 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - **Person detection vs camera motion** — the Matter camera endpoint always uses generic motion (`auto` → vendor native → ONVIF → frame diff). Person detection is only available via the optional **person presence sensor** checkbox (Reolink / UniFi Protect). Legacy `motionObjectType: person` on the camera record is migrated to the separate sensor on save.
 
 ### Fixed
+- **Reolink WhiteLed probe regression** — passive `GetWhiteLed` checks no longer toggle the spotlight on startup, dashboard load, or person-sensor saves. Active hardware verification runs only when the bridged light is enabled. Reduces RTSP/WebRTC disruption (notably on standalone cameras such as Camera A).
+- **Live view first-attempt failures** — `ProvideOffer` now pre-warms the go2rtc transcode for every hub offer (not only compact/Android), reducing first-open timeouts.
+- **Live view slow opens (regression)** — removed blocking ffmpeg pre-warm inside `ProvideOffer` (was adding ~8s before every hub offer after the 2-minute warm window). Pre-warm now runs in the background; startup + periodic refresh keep transcoders hot without delaying signaling.
+- **Dashboard hang on save** — the home page no longer blocks on parallel Reolink WhiteLed hardware probes (same NVR host). Probes run in the background sequentially; camera save redirects immediately after settings persist.
 - **Person presence / Reolink light checkboxes** — saving with the checkbox checked no longer drops the setting (Express submitted both hidden `false` and checkbox `true`; the parser now treats that as enabled).
 
 ### Added
+- **Reset ST binding** — dashboard action recreates a camera's Matter bridged endpoints with a new `uniqueId` so SmartThings can adopt the child again after a stale hub mapping (gray timeline / no live view while snapshots work on the server).
 - **Separate bridged Reolink light** — Reolink cameras with WhiteLed support can expose an extra Matter **Dimmable Light** endpoint (`light-{cameraId}`) with on/off and brightness via `SetWhiteLed` / `GetWhiteLed` (maps to SmartThings `switch` + `switchLevel`).
 - Git sync helpers for switching machines safely: `sync.sh`, `sync.ps1`, and `sync.cmd`.
 - **Separate bridged person sensor** — supported Reolink and UniFi cameras can expose an extra Matter endpoint dedicated to person-only events, separate from the camera motion signal.

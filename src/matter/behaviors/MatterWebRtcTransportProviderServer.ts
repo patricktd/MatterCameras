@@ -128,9 +128,11 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
 
         let exchange;
         try {
-            if (compactHub) {
-                await go2rtc.prewarmWebRtcIfStale(cameraId);
-            }
+            // Never block the hub on ffmpeg pre-warm — cold transcode may still add latency on the first
+            // exchange, but serializing an 8s frame fetch here caused 15–20s live-view opens (regression).
+            void go2rtc.prewarmWebRtcIfStale(cameraId).catch(error => {
+                logger.debug(`Background WebRTC pre-warm failed camera=${cameraId}: ${error}`);
+            });
             // Hub TURN/STUN stays on the controller; go2rtc gets a LAN-only offer copy
             // so it can become ICE controlling and nominate the host pair.
             exchange = await go2rtc.exchangeWebRtcOffer(cameraId, hubOffer, undefined, false, {

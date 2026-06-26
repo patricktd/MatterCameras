@@ -60,6 +60,11 @@ export interface Camera {
     protectCameraId?: string;
     /** How this camera was added in the Web UI wizard. */
     addSource?: 'manual' | 'onvif' | 'unifi-protect' | 'reolink' | 'tapo-sonoff';
+    /**
+     * Incremented when a camera's Matter bridged endpoints are recycled so hubs
+     * treat the child devices as new (new uniqueId per endpoint).
+     */
+    matterBindEpoch?: number;
 }
 
 export interface PairingInfo {

@@ -11,6 +11,7 @@ import {
     ReolinkClient,
     resolveReolinkTarget,
 } from '../motion/providers/reolink/reolinkClient.js';
+import { withReolinkHostLock } from '../motion/providers/reolink/reolinkHostLock.js';
 
 const logger = Logger.get('ReolinkLight');
 
@@ -27,7 +28,33 @@ interface ActiveLight {
 export class ReolinkLightService {
     readonly #lights = new Map<string, ActiveLight>();
 
+    /** Returns true when GetWhiteLed responds (no hardware toggle). */
+    async probePassiveCapability(camera: Camera): Promise<boolean> {
+        const target = resolveReolinkTarget(camera);
+        if (!target) return false;
+
+        const client = new ReolinkClient(target.host, target.username, target.password, {
+            port: target.port,
+            useHttps: target.useHttps,
+        });
+
+        try {
+            await client.ensureAuth();
+            return await withReolinkHostLock(target.host, async () => {
+                return (await client.getWhiteLedState(target.channel)) !== null;
+            });
+        } catch (error) {
+            logger.debug(`Reolink light passive probe failed camera=${camera.id}: ${error}`);
+            return false;
+        }
+    }
+
     /** Returns true when WhiteLed hardware responds to an active on/off probe. */
+    async probeActiveCapability(camera: Camera): Promise<boolean> {
+        return this.probeCapability(camera);
+    }
+
+    /** Active hardware probe — use before creating a bridged light endpoint. */
     async probeCapability(camera: Camera): Promise<boolean> {
         const target = resolveReolinkTarget(camera);
         if (!target) return false;
@@ -39,13 +66,15 @@ export class ReolinkLightService {
 
         try {
             await client.ensureAuth();
-            const verified = await client.verifyWhiteLedControl(target.channel);
-            if (!verified) {
-                logger.info(
-                    `Reolink light hardware probe failed camera=${camera.id} host=${target.host} ch=${target.channel}`,
-                );
-            }
-            return verified;
+            return await withReolinkHostLock(target.host, async () => {
+                const verified = await client.verifyWhiteLedControl(target.channel);
+                if (!verified) {
+                    logger.info(
+                        `Reolink light hardware probe failed camera=${camera.id} host=${target.host} ch=${target.channel}`,
+                    );
+                }
+                return verified;
+            });
         } catch (error) {
             logger.debug(`Reolink light capability probe failed camera=${camera.id}: ${error}`);
             return false;

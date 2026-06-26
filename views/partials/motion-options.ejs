@@ -38,7 +38,7 @@
             <input type="checkbox" id="<%= idPrefix %>-person-sensor-enabled" name="personSensorEnabled" value="true"
                 <%= personSensorEnabledValue ? 'checked' : '' %>>
             <span>
-                <strong>Expose separate person presence sensor in SmartThings</strong>
+                Expose separate person presence sensor via Matter
             </span>
         </label>
     </div>
@@ -50,10 +50,9 @@
             <input type="checkbox" id="<%= idPrefix %>-reolink-light-enabled" name="reolinkLightEnabled" value="true"
                 <%= reolinkLightEnabledValue ? 'checked' : '' %>>
             <span>
-                <strong>Expose separate dimmable light in SmartThings</strong>
+                Expose separate dimmable light via Matter
             </span>
         </label>
-        <p class="field-hint">Requires a camera with a WhiteLed spotlight. Channels without hardware are detected automatically.</p>
     </div>
 
     <div class="motion-field-group" data-show-for="reolink-native auto">

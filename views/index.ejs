@@ -132,6 +132,12 @@
                                 <button type="submit" class="btn btn-sm">Save</button>
                                 <button type="button" class="btn btn-secondary btn-sm btn-duplicate"
                                     data-source-name="<%= cam.name %>">Duplicate</button>
+                                <% if (isCommissioned) { %>
+                                <form action="/api/cameras/<%= cam.id %>/recycle-matter" method="POST" style="display:inline;"
+                                    onsubmit="return confirm('Reset SmartThings binding for <%= cam.name %>? Remove this camera (and any person/light child) from SmartThings first, then confirm.');">
+                                    <button type="submit" class="btn btn-secondary btn-sm">Reset ST binding</button>
+                                </form>
+                                <% } %>
                                 <button type="button" class="btn btn-secondary btn-sm btn-cancel">Cancel</button>
                             </div>
                         </form>
@@ -151,7 +157,7 @@
                         <p><strong>Bridge paired successfully.</strong></p>
                         <p style="margin-top: 8px; color: var(--text-secondary);">
                             Add or remove cameras on the left. After roster changes, use Restart Required if
-                            you want to reload the bridge for SmartThings (about 15 seconds).
+                            you want to reload the bridge (about 15 seconds).
                         </p>
                     </div>
                 <% } else { %>

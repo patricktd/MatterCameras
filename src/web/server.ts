@@ -23,13 +23,12 @@ import {
     logoutProtect,
 } from '../cameraProviders/unifi/protectApi.js';
 import { patchCameraFromProtect, syncExistingProtectCameras } from '../cameraProviders/unifi/syncExisting.js';
-import { installCamera, refreshCameraRuntime, syncReolinkLightCapability } from './cameraInstall.js';
+import { installCamera, refreshCameraRuntime, recycleCameraMatterBinding, scheduleReolinkLightCapabilityProbes } from './cameraInstall.js';
 import { markBridgeRestartRequired } from './bridgeRestartState.js';
 import { bridgeRestartingPageHtml } from './bridgeRestartingPage.js';
 import { parseCameraMotionFields, parseMotionSource } from '../motion/parseMotionForm.js';
 import { setBridgeEndpointCount } from '../config/version.js';
-import { countBridgedEndpoints } from '../matter/personSensorConfig.js';
-import { canCameraExposeReolinkLight } from '../matter/reolinkLightConfig.js';
+import { countBridgedEndpoints, expectedBridgedEndpointIds } from '../matter/personSensorConfig.js';
 
 const app = express();
 const port = appConfig.webPort;
@@ -76,12 +75,7 @@ function resolveReturnToPath(raw: unknown): string {
 
 // Routes
 app.get('/', async (req, res) => {
-    const needsReolinkProbe = storage.getCameras().filter(
-        cam => canCameraExposeReolinkLight(cam) && cam.reolinkLightCapable === undefined,
-    );
-    if (needsReolinkProbe.length > 0) {
-        await Promise.all(needsReolinkProbe.map(cam => syncReolinkLightCapability(cam)));
-    }
+    scheduleReolinkLightCapabilityProbes(storage.getCameras());
 
     const cameras = storage.getCameras().map(sanitizeCameraForPublic);
     const pairingInfo = await bridge.getPairingInfo();
@@ -225,7 +219,19 @@ app.get('/api/diagnostics/snapshots', async (_req, res) => {
             };
         }
     }));
-    res.json({ cameras: results, orphanMatterEndpoints: bridge.listOrphanBridgedCameraIds(new Set(cameras.map(c => c.id))) });
+    res.json({ cameras: results, orphanMatterEndpoints: bridge.listOrphanBridgedCameraIds(expectedBridgedEndpointIds(cameras)) });
+});
+
+app.get('/api/diagnostics/bridge', (_req, res) => {
+    const cameras = storage.getCameras();
+    const expected = expectedBridgedEndpointIds(cameras);
+    const endpoints = bridge.listBridgedMatterEndpoints();
+    res.json({
+        commissioned: bridge.isCommissioned(),
+        expectedEndpointIds: [...expected].sort(),
+        matterEndpoints: endpoints,
+        orphanMatterEndpoints: bridge.listOrphanBridgedCameraIds(expected),
+    });
 });
 
 /** Camera add plugins (UniFi Protect, Reolink, ONVIF, manual). */
@@ -451,21 +457,61 @@ app.post('/api/restart', (req, res) => {
 });
 
 app.post('/api/cameras', async (req, res) => {
-    const motionFields = parseCameraMotionFields(req.body as Record<string, unknown>);
-    const config: Camera = {
-        id: 'cam-' + Date.now(),
-        name: req.body.name,
-        rtspUrl: req.body.rtspUrl,
-        codec: req.body.codec,
-        ...motionFields,
-    };
+    try {
+        const motionFields = parseCameraMotionFields(req.body as Record<string, unknown>);
+        const config: Camera = {
+            id: 'cam-' + Date.now(),
+            name: req.body.name,
+            rtspUrl: req.body.rtspUrl,
+            codec: req.body.codec,
+            ...motionFields,
+        };
 
-    await installCamera(config);
+        await installCamera(config);
 
-    res.redirect('/');
+        res.redirect('/');
+    } catch (error) {
+        console.error('Camera install failed:', error);
+        res.status(500).send(`Failed to save camera: ${error instanceof Error ? error.message : String(error)}`);
+    }
 });
 
 app.post('/api/cameras/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const existing = storage.getCamera(id);
+        if (!existing) {
+            res.status(404).send('Camera not found');
+            return;
+        }
+
+        const motionFields = parseCameraMotionFields(req.body as Record<string, unknown>);
+        const updated = await storage.updateCamera(id, {
+            name: req.body.name,
+            rtspUrl: req.body.rtspUrl,
+            codec: req.body.codec,
+            ...motionFields,
+            motionSource: parseMotionSource(
+                req.body.motionSource,
+                existing.motionSource ?? 'frame-diff',
+            ),
+        });
+
+        if (!updated) {
+            res.status(404).send('Camera not found');
+            return;
+        }
+
+        await refreshCameraRuntime(existing, updated);
+
+        res.redirect('/');
+    } catch (error) {
+        console.error(`Camera save failed id=${req.params.id}:`, error);
+        res.status(500).send(`Failed to save camera: ${error instanceof Error ? error.message : String(error)}`);
+    }
+});
+
+app.post('/api/cameras/:id/recycle-matter', async (req, res) => {
     const { id } = req.params;
     const existing = storage.getCamera(id);
     if (!existing) {
@@ -473,26 +519,13 @@ app.post('/api/cameras/:id', async (req, res) => {
         return;
     }
 
-    const motionFields = parseCameraMotionFields(req.body as Record<string, unknown>);
-    const updated = await storage.updateCamera(id, {
-        name: req.body.name,
-        rtspUrl: req.body.rtspUrl,
-        codec: req.body.codec,
-        ...motionFields,
-        motionSource: parseMotionSource(
-            req.body.motionSource,
-            existing.motionSource ?? 'frame-diff',
-        ),
-    });
-
-    if (!updated) {
-        res.status(404).send('Camera not found');
-        return;
+    try {
+        await recycleCameraMatterBinding(existing);
+        res.redirect('/?recycled=' + encodeURIComponent(existing.name));
+    } catch (error) {
+        console.error(`Matter recycle failed id=${id}:`, error);
+        res.status(500).send(`Failed to recycle Matter binding: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    await refreshCameraRuntime(existing, updated);
-
-    res.redirect('/');
 });
 
 app.post('/api/cameras/:id/duplicate', async (req, res) => {

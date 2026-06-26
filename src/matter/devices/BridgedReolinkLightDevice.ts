@@ -6,6 +6,7 @@ import { reolinkLightEndpointId, reolinkLightLabel } from '../reolinkLightConfig
 import { reolinkBrightToMatterLevel } from '../reolinkLightLevels.js';
 import { MatterReolinkLightOnOffServer } from '../behaviors/MatterReolinkLightOnOffServer.js';
 import { MatterReolinkLightLevelControlServer } from '../behaviors/MatterReolinkLightLevelControlServer.js';
+import { bridgedUniqueId } from '../bridgedUniqueId.js';
 
 export const BridgedReolinkLightDevice = DimmableLightDevice.with(
     BridgedDeviceBasicInformationServer,
@@ -25,7 +26,7 @@ export function bridgedReolinkLightOptions(camera: Camera) {
             vendorName: 'MatterCameras',
             productName: 'Light',
             serialNumber: id,
-            uniqueId: `${id}-uid`,
+            uniqueId: bridgedUniqueId(id, camera.matterBindEpoch),
             hardwareVersion: 1,
             hardwareVersionString: '1.0',
             softwareVersion: getMatterSoftwareVersion(),

@@ -7,8 +7,10 @@ import { canCameraExposeReolinkLight } from '../matter/reolinkLightConfig.js';
 import { markBridgeRestartRequired } from '../web/bridgeRestartState.js';
 
 export interface SyncReolinkLightCapabilityOptions {
-    /** Re-run the active WhiteLed probe even when a prior result is stored. */
+    /** Re-run the WhiteLed probe even when a prior result is stored. */
     force?: boolean;
+    /** Active toggle probe — only when the user enables the bridged light. */
+    active?: boolean;
 }
 
 export async function syncReolinkLightCapability(
@@ -26,15 +28,18 @@ export async function syncReolinkLightCapability(
         return camera;
     }
 
-    if (!options.force && camera.reolinkLightCapable !== undefined) {
-        if (camera.reolinkLightCapable === false && camera.reolinkLightEnabled) {
-            const cleared = await storage.updateCamera(camera.id, { reolinkLightEnabled: false });
-            return cleared ?? { ...camera, reolinkLightEnabled: false };
-        }
+    const needsProbe = options.force
+        || camera.reolinkLightCapable === undefined
+        || (camera.reolinkLightCapable === false && camera.reolinkLightEnabled);
+
+    if (!needsProbe) {
         return camera;
     }
 
-    const capable = await bridge.reolinkLight.probeCapability(camera);
+    const probe = options.active
+        ? bridge.reolinkLight.probeActiveCapability(camera)
+        : bridge.reolinkLight.probePassiveCapability(camera);
+    const capable = await probe;
     const updates: Partial<Omit<Camera, 'id'>> = { reolinkLightCapable: capable };
     if (!capable) {
         updates.reolinkLightEnabled = false;
@@ -48,10 +53,31 @@ export async function syncReolinkLightCapability(
     return updated ?? { ...camera, ...updates };
 }
 
+/** Probe Reolink spotlight support in the background without toggling hardware. */
+export function scheduleReolinkLightCapabilityProbes(cameras: Camera[]): void {
+    const pending = cameras.filter(
+        cam => canCameraExposeReolinkLight(cam) && cam.reolinkLightCapable === undefined,
+    );
+    if (!pending.length) return;
+
+    void (async () => {
+        for (const cam of pending) {
+            try {
+                await syncReolinkLightCapability(cam);
+            } catch (error) {
+                console.warn(`Background Reolink light probe failed camera=${cam.id}: ${error}`);
+            }
+        }
+    })();
+}
+
 export async function installCamera(config: Camera): Promise<Camera> {
     await storage.addCamera(config);
     let camera = storage.getCamera(config.id) ?? config;
-    camera = await syncReolinkLightCapability(camera, { force: true });
+    camera = await syncReolinkLightCapability(camera, {
+        force: true,
+        active: camera.reolinkLightEnabled === true,
+    });
 
     setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.addCamera(camera);
@@ -59,6 +85,16 @@ export async function installCamera(config: Camera): Promise<Camera> {
     bridge.startMotionDetection(camera);
     await markBridgeRestartRequired();
     return camera;
+}
+
+export async function recycleCameraMatterBinding(camera: Camera): Promise<Camera> {
+    const bindEpoch = (camera.matterBindEpoch ?? 0) + 1;
+    const updated = await storage.updateCamera(camera.id, { matterBindEpoch: bindEpoch });
+    const rebound = updated ?? { ...camera, matterBindEpoch: bindEpoch };
+
+    await bridge.recycleMatterBinding(rebound, bindEpoch);
+    await markBridgeRestartRequired();
+    return rebound;
 }
 
 export async function refreshCameraRuntime(existing: Camera, updated: Camera): Promise<void> {
@@ -71,7 +107,10 @@ export async function refreshCameraRuntime(existing: Camera, updated: Camera): P
         || updated.rtspUrl !== existing.rtspUrl
         || updated.reolinkLightEnabled !== existing.reolinkLightEnabled;
 
-    const camera = await syncReolinkLightCapability(updated, { force: forceReolinkProbe });
+    const camera = await syncReolinkLightCapability(updated, {
+        force: forceReolinkProbe,
+        active: updated.reolinkLightEnabled === true,
+    });
 
     await bridge.updateCamera(camera);
 

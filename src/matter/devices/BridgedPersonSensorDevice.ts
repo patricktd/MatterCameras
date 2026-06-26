@@ -5,6 +5,7 @@ import { occupancySensingDefaults } from './occupancySensingDefaults.js';
 import type { Camera } from '../../types/index.js';
 import { getMatterSoftwareVersion, getMatterSoftwareVersionString } from '../../config/version.js';
 import { personSensorEndpointId, personSensorLabel } from '../personSensorConfig.js';
+import { bridgedUniqueId } from '../bridgedUniqueId.js';
 
 export const BridgedPersonSensorDevice = OccupancySensorDevice.with(
     BridgedDeviceBasicInformationServer,
@@ -23,7 +24,7 @@ export function bridgedPersonSensorOptions(camera: Camera) {
             vendorName: 'MatterCameras',
             productName: 'Presence Sensor',
             serialNumber: id,
-            uniqueId: `${id}-uid`,
+            uniqueId: bridgedUniqueId(id, camera.matterBindEpoch),
             hardwareVersion: 1,
             hardwareVersionString: '1.0',
             softwareVersion: getMatterSoftwareVersion(),
