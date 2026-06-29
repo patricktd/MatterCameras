@@ -55,7 +55,7 @@ cp deploy.env.example deploy.env
 
 ## Full deploy
 
-Rebuilds images, syncs the full tree **and `dist/`** (required — see below). **Bumps `package.json` patch by +0.0.1** before build:
+Rebuilds images, syncs the full tree **and `dist/`** (required — see below). Does **not** change `package.json` version:
 
 ```bash
 npm run deploy
@@ -69,7 +69,7 @@ Use full deploy when adding or upgrading **npm dependencies** (e.g. `onvif`) —
 
 ## Quick deploy (code-only)
 
-Bumps version, builds TypeScript, syncs `dist/`, `views/`, `public/`, `package.json`, restarts **app**:
+Builds TypeScript (if needed), syncs `dist/`, `views/`, `public/`, `package.json`, restarts **app**:
 
 ```bash
 npm run quick-deploy
@@ -79,9 +79,20 @@ npm run quick-deploy
 ./quick-deploy.sh
 ```
 
-Pass `--no-bump` to skip the version increment (e.g. when `npm run quick-deploy` already bumped).
-
 Both scripts end with **`docker compose restart app`** so `/api/version` reflects the bind-mounted `package.json` (read once at Node startup).
+
+## Release versioning
+
+Deploy and quick-deploy **never** bump the version. For a community release:
+
+```bash
+npm run release              # patch: 0.3.63-beta → 0.3.64-beta
+npm run release:minor        # minor: 0.3.63-beta → 0.4.0-beta
+npm run release:major        # major: 0.3.63-beta → 1.0.0-beta
+# or: node scripts/release-version.mjs 0.4.0-beta
+```
+
+Then move `CHANGELOG.md` `[Unreleased]` entries under `[X.Y.Z] — date`, commit, tag (`git tag v0.3.64-beta`), and deploy.
 
 ## Root shortcuts
 
@@ -157,6 +168,16 @@ Deploy scripts **never rsync** these paths from the workstation:
 - **Lost `cameras.json`:** re-add cameras in the Web UI. Reuse the same camera IDs from startup logs if you need hub continuity (`Adding bridged camera: <name> (<id>)`).
 - **Lost `matter-storage/`:** delete hub pairing for the bridge and commission again with a new QR.
 - **Wrong `matterHost` after moving hardware:** re-run `bash scripts/setup.sh --host <new-ip>` on the server or edit `data/config.json` + `data/go2rtc.yaml` there.
+
+## Local-only maintainer files (not in git)
+
+Production hostnames, deploy targets, and AI handoff notes live in paths that are **gitignored** and must not be pushed to the public repository:
+
+- `deploy.env` — SSH target for `npm run deploy`
+- `docs/AGENT-CONTEXT.md` — maintainer/agent handoff (copy from a private template if needed)
+- `.cursor/rules/` — Cursor rules for local development
+
+Keep production IPs, credentials, and internal runbooks out of tracked files (`README.md`, `CHANGELOG.md`, `docs/**` that ship on GitHub).
 
 ## Host networking
 

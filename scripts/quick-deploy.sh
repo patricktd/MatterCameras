@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Fast iteration deploy: sync compiled JS only, restart app container.
-# Bumps package.json patch (+0.0.1) unless called with --no-bump (e.g. from npm run quick-deploy).
+# Does not change package.json version — use npm run release when publishing.
 #
 # NEVER syncs or overwrites on the remote host:
 #   - data/cameras.json     (operator-managed camera roster)
@@ -18,13 +18,6 @@ if command -v uname >/dev/null 2>&1 && uname -s 2>/dev/null | grep -qiE 'mingw|m
     echo "On Windows, use ./quick-deploy.ps1 or npm run quick-deploy (tar+ssh sync)." >&2
     exit 1
 fi
-
-NO_BUMP=false
-for arg in "$@"; do
-    case "$arg" in
-        --no-bump) NO_BUMP=true ;;
-    esac
-done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT_NODE="$ROOT"
@@ -45,9 +38,9 @@ HOST="${DEPLOY_HOST}"
 USER_NAME="${DEPLOY_USER}"
 DEST="${DEPLOY_DIR}"
 
-if [ "$NO_BUMP" = false ]; then
-  node "${ROOT_NODE}/scripts/bump-deploy-version.mjs"
-  npm run build --prefix "${ROOT_NODE}"
+if [ ! -d "${ROOT}/dist" ]; then
+    echo "==> Building (dist/ missing)..."
+    npm run build --prefix "${ROOT_NODE}"
 fi
 
 DEPLOY_VERSION="$(node -e "const fs=require('fs'); const path=require('path'); const root=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); console.log(pkg.version);" "${ROOT_NODE}")"

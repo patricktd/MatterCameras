@@ -1,6 +1,6 @@
 # Installation guide (testers)
 
-Step-by-step setup for trying **MatterCameras** on your own LAN with SmartThings (or another Matter 1.5 camera controller).
+Step-by-step setup for trying **MatterCameras** on your own LAN with a Matter 1.5 camera–capable hub.
 
 ## What you need
 
@@ -9,7 +9,7 @@ Step-by-step setup for trying **MatterCameras** on your own LAN with SmartThings
 | **Linux or macOS host** | Same subnet as your Matter hub and cameras |
 | **Docker** + Compose v2 | Recommended path (`bash scripts/setup.sh`) |
 | **Node.js 22+** | Required for Docker install too — setup compiles `dist/` before `docker compose` |
-| **Matter hub** | Aeotec / SmartThings standalone hub with **Matter 1.5 camera** firmware |
+| **Matter hub** | Firmware that supports **Matter 1.5 cameras** (e.g. Aeotec / SmartThings standalone hub) |
 | **RTSP camera** | H.264 native is best; H.265 works via ffmpeg transcode (more CPU) |
 | **Open ports on the host** | See [Ports](#ports) below |
 
@@ -45,12 +45,12 @@ Open the Web UI at `http://<your-lan-ip>:3202`.
 
 Ensure nothing else on the host binds these ports before starting.
 
-## Pair with SmartThings
+## Pair with your Matter hub
 
 1. Update the hub to firmware that supports **Matter 1.5 cameras**.
 2. Open the Web UI on a device on the same LAN.
 3. In the **Matter pairing** section, scan the QR code (or enter the manual pairing code).
-4. In the SmartThings app: **Add device → Matter → scan QR**.
+4. In your hub app, add a Matter device and scan the QR (e.g. SmartThings: **Add device → Matter → scan QR**).
 5. Wait until the bridge appears as a Matter device.
 
 > **Important:** `matterHost` in `data/config.json` must be the bridge machine’s **LAN IP**, not `127.0.0.1`. The setup script sets this automatically. If you move the bridge to another machine, re-run `./scripts/setup.sh --host <new-ip>` on fresh data or edit `data/config.json` and `data/go2rtc.yaml` (WebRTC `candidates` / `filters.ips`).
@@ -72,13 +72,13 @@ If ONVIF is on a non-standard port, set **ONVIF device URL** under Advanced afte
 1. Web UI → **Add camera**
 2. Name + RTSP URL, e.g. `rtsp://user:pass@192.168.1.100:554/stream1`
 3. Save — the bridge registers the stream in go2rtc and exposes a new bridged Matter camera endpoint.
-4. In SmartThings, open the bridge device and confirm the new camera appears (may take a short hub sync).
+4. In your hub app, open the bridge device and confirm the new camera appears (may take a short hub sync).
 
 **Motion (Advanced):** default **Frame diff** works on any RTSP. Choose **ONVIF events** if the camera supports ONVIF motion (lower CPU).
 
-### More than 4 cameras on SmartThings
+### More than 4 cameras (hub app limits)
 
-Live view works for all bridged cameras. The SmartThings app only lets you pick **4 cameras** for cloud monitoring **card previews** — cameras outside that selection may show empty cards. Change the selection in **Home Monitor → Cameras**.
+Live view works for all bridged cameras on the bridge. Some hub apps (including **SmartThings**) only let you pick **4 cameras** for cloud monitoring **card previews** — cameras outside that selection may show empty cards. On SmartThings, change the selection in **Home Monitor → Cameras**.
 
 ### No camera yet?
 
@@ -135,7 +135,7 @@ Environment variables (override file config): `MATTER_HOST`, `MATTER_PORT`, `WEB
 | Hub cannot find bridge | Same VLAN/subnet; UDP 5353 not blocked; `matterHost` is LAN IP |
 | Live view black / timeout | WebRTC port **8555** open host↔hub; see [WEBRTC-DEBUG.md](WEBRTC-DEBUG.md) |
 | Snapshot works, no video | Usually ICE/TURN — confirm `go2rtc.yaml` `candidates` IP |
-| Camera added but not on hub | Restart app container; re-open bridge in SmartThings |
+| Camera added but not on hub | Restart app container; re-open bridge in the hub app |
 | High CPU | H.265 transcode per camera; enable H.264 on the camera if possible |
 
 ## Stopping / reset
@@ -151,5 +151,5 @@ docker compose down
 ## Next steps
 
 - [SCALING.md](SCALING.md) — hardware and camera count limits
-- [MATTER-CAMERA.md](MATTER-CAMERA.md) — feature matrix vs SmartThings
+- [MATTER-CAMERA.md](MATTER-CAMERA.md) — feature matrix vs hub capabilities
 - [DEPLOY.md](DEPLOY.md) — maintainer production deploy (rsync / remote host)

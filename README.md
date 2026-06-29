@@ -1,13 +1,13 @@
 # MatterCameras
 
-> **Beta (pre-1.0)** — version bumps +0.0.1 on each deploy. Verify with `curl http://<host>:3202/api/version`.
+> **Beta (pre-1.0)** — version is set in `package.json` and bumped only on release (`npm run release`). Verify with `curl http://<host>:3202/api/version`.
 
-Bridge RTSP/ONVIF cameras into **Matter 1.5 Camera** devices for SmartThings (Aeotec Hub v2) and other Matter controllers.
+Bridge RTSP/ONVIF cameras into **Matter 1.5 Camera** devices for any Matter 1.5–capable hub or controller (SmartThings, Google Home, Apple Home, and others as they add camera support).
 
 ## Architecture
 
 ```
-RTSP/ONVIF → go2rtc (WebRTC) → Matter Bridge (matter.js 0.17) → SmartThings Hub
+RTSP/ONVIF → go2rtc (WebRTC) → Matter Bridge (matter.js 0.17) → Matter hub / controller
 ```
 
 - **Matter bridge** — bridged `Camera` endpoints (type `0x0142`) with AV Stream + WebRTC clusters
@@ -26,7 +26,7 @@ bash scripts/setup.sh
 
 The script detects your LAN IP, creates `data/config.json` / `data/go2rtc.yaml` / `.env`, runs `npm ci && npm run build`, and starts **go2rtc** + **app** in Docker.
 
-Then open `http://<your-lan-ip>:3202`, pair the Matter QR in SmartThings, and add a camera.
+Then open `http://<your-lan-ip>:3202`, pair the Matter QR in your hub app, and add a camera.
 
 **Full walkthrough:** [docs/INSTALL.md](docs/INSTALL.md) (pairing, ports, troubleshooting, dev mode).
 
@@ -42,7 +42,7 @@ bash scripts/setup.sh --host 192.168.1.50
 |-----|----------|
 | **[docs/INSTALL.md](docs/INSTALL.md)** | Testers — first install, pairing, cameras |
 | **[docs/SCALING.md](docs/SCALING.md)** | Operators — hardware limits and camera count |
-| **[docs/MATTER-CAMERA.md](docs/MATTER-CAMERA.md)** | Integrators — Matter features vs SmartThings |
+| **[docs/MATTER-CAMERA.md](docs/MATTER-CAMERA.md)** | Integrators — Matter features vs hub capabilities |
 | **[docs/WEBRTC-DEBUG.md](docs/WEBRTC-DEBUG.md)** | Debugging live view / ICE / TURN |
 | **[docs/DEPLOY.md](docs/DEPLOY.md)** | Maintainers — rsync deploy to production host |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history and system overview |
@@ -80,7 +80,7 @@ App-only on host: `./scripts/setup.sh --dev` and `docker compose up -d go2rtc`.
 ## Status (beta)
 
 - [x] Matter 1.5 Camera device type (bridged)
-- [x] Live view WebRTC (iOS + Android SmartThings app)
+- [x] Live view WebRTC (iOS + Android — verified on SmartThings)
 - [x] JPEG snapshots and card preview
 - [x] Motion events (Zone Management + OccupancySensing + RTSP frame-diff or ONVIF PullPoint)
 - [x] ONVIF WS-Discovery (Web UI scan + REST API)

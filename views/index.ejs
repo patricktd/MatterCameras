@@ -15,10 +15,10 @@
 
         <% if (cameras.length > 4) { %>
             <div class="notice-banner notice-banner--warning main-grid-full">
-                <strong>SmartThings preview limit:</strong> the mobile app lets you pick up to
+                <strong>Hub preview limit:</strong> some hub apps (e.g. SmartThings) let you pick up to
                 <strong>4 cameras</strong> for cloud monitoring card previews. Live view works for all
                 <%= cameras.length %> cameras; cameras outside your selection may show a stale or empty card.
-                Change the selection in SmartThings → Home Monitor → Cameras.
+                On SmartThings, change the selection in <strong>Home Monitor → Cameras</strong>.
             </div>
         <% } %>
 
@@ -135,7 +135,7 @@
                                     data-source-name="<%= cam.name %>">Duplicate</button>
                                 <% if (isCommissioned) { %>
                                 <form action="/api/cameras/<%= cam.id %>/recycle-matter" method="POST" style="display:inline;"
-                                    onsubmit="return confirm('Reset SmartThings binding for <%= cam.name %>? Remove this camera (and any person/light child) from SmartThings first, then confirm.');">
+                                    onsubmit="return confirm('Reset hub binding for <%= cam.name %>? Remove this camera (and any person/light child) from your hub app first, then confirm.');">
                                     <button type="submit" class="btn btn-secondary btn-sm">Reset Binding</button>
                                 </form>
                                 <% } %>
@@ -151,7 +151,7 @@
 
         <div>
             <div class="card qr-section">
-                <h2>Pairing (SmartThings)</h2>
+                <h2>Matter pairing</h2>
 
                 <% if (isCommissioned) { %>
                     <div class="pairing-success">
@@ -176,7 +176,7 @@
                         alt="Matter Pairing QR">
 
                     <div style="margin-top: 16px;">
-                        <small style="color: var(--text-secondary);">Manual code (SmartThings → Matter → Enter code)</small>
+                        <small style="color: var(--text-secondary);">Manual code (hub app → Matter → Enter code)</small>
                         <span id="pairing-manual-code" class="pairing-code"><%= pairingInfo.manualPairingCode %></span>
                     </div>
 

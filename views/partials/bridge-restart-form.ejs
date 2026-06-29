@@ -1,5 +1,5 @@
 <form action="/api/restart" method="POST" class="inline-form restart-bridge-form"
-    onsubmit="return confirm('Restart the bridge? SmartThings may take ~30s to reconnect.');">
+    onsubmit="return confirm('Restart the bridge? Your Matter hub may take ~30s to reconnect.');">
     <% if (typeof returnTo !== 'undefined' && returnTo) { %>
         <input type="hidden" name="returnTo" value="<%= returnTo %>">
     <% } %>

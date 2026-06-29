@@ -246,11 +246,11 @@ On failure: log, try next in chain (same as today's ONVIF → frame-diff).
 ### Axis 3 — Multi-node / horizontal scale
 
 Per `docs/SCALING.md`, single-node practical limit is **~5–8 cameras** with transcoding.
-For growth beyond SmartThings ~50-device comfort zone:
+For growth beyond a single hub's ~50-device comfort zone (e.g. SmartThings):
 
 ```
                     ┌─────────────────────┐
-                    │  SmartThings Hub    │
+                    │  Matter hub         │
                     └──────────┬──────────┘
                                │ Matter
           ┌────────────────────┼────────────────────┐

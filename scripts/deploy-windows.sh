@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
-# Windows deploy: bump, build, file sync, remote Docker — one SSH multiplex session.
+# Windows deploy: build, file sync, remote Docker — one SSH multiplex session.
 set -euo pipefail
 
 MODE="${1:?full|quick}"
 shift || true
-
-NO_BUMP=false
-for arg in "$@"; do
-    case "$arg" in
-        --no-bump) NO_BUMP=true ;;
-    esac
-done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT_NODE="$ROOT"
@@ -29,8 +22,8 @@ setup_deploy_ssh
 deploy_ssh_mux_start
 trap 'deploy_ssh_mux_stop' EXIT
 
-if [ "$NO_BUMP" = false ]; then
-    node "${ROOT_NODE}/scripts/bump-deploy-version.mjs"
+if [ ! -d "${ROOT}/dist" ]; then
+    echo "==> Building (dist/ missing)..."
     npm run build --prefix "${ROOT_NODE}"
 fi
 

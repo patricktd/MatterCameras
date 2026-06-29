@@ -1,14 +1,14 @@
 <%- include('partials/header', { pageTitle: 'Options', bridgeStatus, appVersion, activePage: 'options', bridgeRestartPending }) %>
 
     <div class="card options-page">
-        <h2>SmartThings</h2>
+        <h2>Matter hub</h2>
         <p class="field-hint" style="margin-top: 0;">
-            Motion automations use <strong>OccupancySensing</strong> on the hub (matter-switch maps it to
+            Motion automations use <strong>OccupancySensing</strong> on the hub (e.g. SmartThings maps it to
             <em>Motion detected</em>). The bridge always reports occupancy during <code>ZoneTriggered</code>
             events. Card motion icons and routines share the same signal.
         </p>
         <p class="field-hint">
-            After hub firmware or driver updates, open <strong>MatterCameras Bridge</strong> in the app and
+            After hub firmware or driver updates, open <strong>MatterCameras Bridge</strong> in your hub app and
             pull down to refresh so cameras re-profile.
         </p>
     </div>
@@ -40,7 +40,7 @@
     <div class="card options-page">
         <h2>Bridge</h2>
         <p class="field-hint" style="margin-top: 0;">
-            Restart reloads all cameras and refreshes the Matter parts list for SmartThings after roster changes.
+            Restart reloads all cameras and refreshes the Matter parts list for the hub after roster changes.
         </p>
         <%- include('partials/bridge-restart-form', { returnTo: '/options', bridgeRestartPending }) %>
 

@@ -1,27 +1,29 @@
-# Matter 1.5 camera features (SmartThings)
+# Matter 1.5 camera features
 
 Bridge device type: **Camera `0x0142`** (bridged endpoint per RTSP camera).
 
+Status below reflects bridge implementation and **hub/app** behavior on a Matter 1.5 camera controller. **SmartThings** is the primary reference platform today; other hubs may differ in automation UI, recording plans, and sync behavior.
+
 ## Current status
 
-| Feature | Matter cluster | Bridge | SmartThings |
-|---------|----------------|--------|-------------|
-| Live view (iOS) | WebRTC Transport Provider | OK | OK — fast first attempt |
-| Live view (Android) | WebRTC Transport Provider | OK | OK (2026-06-09; was signaling order, not DTLS) |
+| Feature | Matter cluster | Bridge | Hub / app |
+|---------|----------------|--------|-----------|
+| Live view (iOS) | WebRTC Transport Provider | OK | OK — fast first attempt (SmartThings) |
+| Live view (Android) | WebRTC Transport Provider | OK | OK (SmartThings, 2026-06-09) |
 | Snapshot / card preview | Camera AV Stream Management | OK | OK |
 | Image flip / rotation | ImageControl (AV cluster) | OK | OK — set in device settings; re-open live view after change |
-| **Notification image** | `CaptureSnapshot` | OK | **OK** — JPEG appears in push notification |
-| Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | frame-diff or ONVIF | Hub reprofile (`softwareVersion` 301+) or 61.x drivers |
+| **Notification image** | `CaptureSnapshot` | OK | **OK** — JPEG in push notification (hub-dependent) |
+| Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | frame-diff or ONVIF | Hub reprofile (`softwareVersion` 301+) or newer drivers |
 | ONVIF discovery | REST + Web UI | WS-Discovery UDP 3702 | Requires Docker host networking |
-| Cloud recording plan | **Push AV Stream Transport** `0x0555` | **Not implemented** | UI shows plan; **no clips upload** |
+| Cloud recording plan | **Push AV Stream Transport** `0x0555` | **Not implemented** | Some hubs show plan UI; **no clips upload** |
 
 ---
 
 ## Snapshots and notifications
 
-SmartThings requests `CaptureSnapshot` over Matter. The bridge grabs a JPEG from go2rtc (`/api/frame.jpeg?width=640`) preserving aspect ratio and returns it in the Matter response.
+The hub requests `CaptureSnapshot` over Matter. The bridge grabs a JPEG from go2rtc (`/api/frame.jpeg?width=640`) preserving aspect ratio and returns it in the Matter response.
 
-When motion or camera events fire, SmartThings can attach that snapshot to the **push notification** — confirmed working in production (2026-06-08). Delivery is **hub-driven** (not every `ZoneTriggered` gets a `CaptureSnapshot` request). Native camera motion alerts include images; custom routine “send notification” actions are usually text-only.
+When motion or camera events fire, the hub app can attach that snapshot to a **push notification** — confirmed on SmartThings (2026-06-08). Delivery is **hub-driven** (not every `ZoneTriggered` gets a `CaptureSnapshot` request). Native camera motion alerts may include images; custom routine “send notification” actions are often text-only.
 
 Logs:
 
@@ -34,7 +36,7 @@ CaptureSnapshot done camera=cam-… 640x853 … bytes
 
 ## Image orientation (ImageControl)
 
-SmartThings exposes **flip horizontal**, **flip vertical**, and **rotation** (0–359°) under camera device settings. The hub writes Matter attributes on the bridged endpoint; the bridge rebuilds go2rtc ffmpeg sources with an `-vf` filter chain (`transpose`, `hflip`, `vflip`, or `rotate=` for non-90° steps).
+Hub apps expose **flip horizontal**, **flip vertical**, and **rotation** (0–359°) under camera device settings. The hub writes Matter attributes on the bridged endpoint; the bridge rebuilds go2rtc ffmpeg sources with an `-vf` filter chain (`transpose`, `hflip`, `vflip`, or `rotate=` for non-90° steps).
 
 Applies to **live view**, **card snapshots**, and **motion frame sampling** so all paths stay consistent.
 
@@ -80,21 +82,21 @@ Optional `onvifUrl` (Tapo often port **2020**).
 - Optional `motionObjectType: person` restricts the trigger to vendor person detection on those two native providers.
 - Optional `personSensorEnabled: true` adds a second bridged Matter endpoint dedicated to person events.
 
-Important: SmartThings still sees the same binary **Motion detected** / **OccupancySensing** signal. `motionObjectType: person` only changes which upstream Reolink / UniFi event is allowed to flip that signal.
+Important: the hub still sees the same binary **Motion detected** / **OccupancySensing** signal. `motionObjectType: person` only changes which upstream Reolink / UniFi event is allowed to flip that signal.
 
-With `personSensorEnabled: true`, the bridge also exposes a separate Matter **Occupancy Sensor** endpoint for that camera, treated as **person presence** semantics. SmartThings Matter sensor handling can map `OccupancySensing` to automation-friendly sensor capabilities, which is the cleanest path to split camera motion from person-presence events without changing the camera device type itself.
+With `personSensorEnabled: true`, the bridge also exposes a separate Matter **Occupancy Sensor** endpoint for that camera, treated as **person presence** semantics. Controllers that map `OccupancySensing` to automation-friendly sensor capabilities (e.g. SmartThings **motionSensor**) can split camera motion from person-presence events without changing the camera device type itself.
 
-Optional `reolinkLightEnabled: true` (Reolink only) adds a third bridged Matter endpoint — an **On/Off Light** for the camera WhiteLed spotlight. The bridge probes `GetWhiteLed` at startup; cameras without spotlight hardware skip endpoint creation. SmartThings maps the endpoint to a switch for scenes and automations.
+Optional `reolinkLightEnabled: true` (Reolink only) adds a third bridged Matter endpoint — an **On/Off Light** for the camera WhiteLed spotlight. The bridge probes `GetWhiteLed` at startup; cameras without spotlight hardware skip endpoint creation. The hub may map the endpoint to a switch for scenes and automations.
 
 **Architecture:** [MOTION-PROVIDERS.md](./MOTION-PROVIDERS.md).
 
 Inspired by [matter-onvif-bridge](https://github.com/iamjairo/matter-onvif-bridge).
 
-When motion is detected, the bridge emits `ZoneTriggered` / `ZoneStopped` and updates **OccupancySensing**. SmartThings matter-switch maps occupancy to **motionSensor**, so routines use:
+When motion is detected, the bridge emits `ZoneTriggered` / `ZoneStopped` and updates **OccupancySensing**. On SmartThings, matter-switch maps occupancy to **motionSensor**, so routines use:
 
 **IF → Device status → Camera → Motion detected**
 
-(`ZoneTriggered` alone does not appear in the routine picker; it drives `zoneManagement` state on the hub.)
+(`ZoneTriggered` alone does not appear in the routine picker on SmartThings; it drives `zoneManagement` state on the hub. Other platforms may expose zone events differently.)
 
 ### Logs to watch
 
@@ -108,7 +110,7 @@ ZoneStopped camera=cam-… zone=1 reason=0
 
 ### After deploy
 
-Existing paired cameras may need a **hub refresh** (or remove/re-add one camera) so SmartThings discovers the new Zone Management cluster on the endpoint.
+Existing paired cameras may need a **hub refresh** (or remove/re-add one camera) so the controller discovers the new Zone Management cluster on the endpoint.
 
 ---
 
@@ -135,7 +137,7 @@ curl -s -X POST http://<host>:3202/api/onvif/resolve \
 
 ## Cloud recording plan (why it does not record)
 
-SmartThings offers a subscription plan to select up to **4 cameras** for cloud recording. The UI appears because the device type is **Matter Camera**, but clips are uploaded via a different path than live view:
+Some hubs (e.g. SmartThings) offer a subscription plan to select up to **4 cameras** for cloud recording. The UI may appear because the device type is **Matter Camera**, but clips are uploaded via a different path than live view:
 
 ### Matter path for recording
 
@@ -162,7 +164,7 @@ Over 7 days of production logs:
 - **`streamUsage: 1` (Recording)** in WebRTC `ProvideOffer`: zero
 - Only **`streamUsage: 3` (LiveView)** for WebRTC
 
-Conclusion: the hub never started a push transport with this bridge. The recording plan UI is shown at the **SmartThings account/plan** level, but without Push AV Stream the bridge cannot upload clips. Implementing recording is a **large follow-up** (CMAF pipeline + TLS + time sync), not a small fix.
+Conclusion: the hub never started a push transport with this bridge. A recording plan UI may be shown at the **account/plan** level on some platforms, but without Push AV Stream the bridge cannot upload clips. Implementing recording is a **large follow-up** (CMAF pipeline + TLS + time sync), not a small fix.
 
 When the hub eventually requests recording streams, logs will show:
 
@@ -174,15 +176,17 @@ VideoStreamAllocate Recording camera=cam-… (Push AV Stream Transport not imple
 
 ## Routines cheat sheet
 
+Platform-specific automation UIs differ. Example for **SmartThings**:
+
 | Trigger (IF) | Matter basis | Available now |
 |--------------|--------------|---------------|
-| Motion detected | `ZoneTriggered` | After this deploy + hub refresh |
-| Manual / time | — | Standard SmartThings |
+| Motion detected | `ZoneTriggered` + `OccupancySensing` | After deploy + hub refresh |
+| Manual / time | — | Standard hub automations |
 | Live view open | — | Not a Matter routine trigger |
 
 | Action (THEN) | Available now |
 |---------------|---------------|
-| Send notification (with snapshot) | OK |
+| Send notification (with snapshot) | OK (hub-dependent) |
 | Turn on lights / scene | OK |
 | Start recording clip | **No** — needs Push AV Stream |
 
@@ -190,7 +194,7 @@ VideoStreamAllocate Recording camera=cam-… (Push AV Stream Transport not imple
 
 ## Matter 1.5.1 (not available yet)
 
-CSA maintenance release adds multi-stream delivery, HEIC snapshots, and HLS/DASH CMAF upload. Requires Matter SDK 1.5.1, SmartThings hub support, and bridge implementation (especially **Push AV Stream** for recording). See [matter-smarthome.de overview](https://matter-smarthome.de/en/development/matter-1-5-1-camera-refinements-and-more-flexibility/).
+CSA maintenance release adds multi-stream delivery, HEIC snapshots, and HLS/DASH CMAF upload. Requires Matter SDK 1.5.1, hub firmware support, and bridge implementation (especially **Push AV Stream** for recording). See [matter-smarthome.de overview](https://matter-smarthome.de/en/development/matter-1-5-1-camera-refinements-and-more-flexibility/).
 
 ---
 

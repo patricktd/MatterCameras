@@ -22,7 +22,6 @@ if (!existsSync(join(root, 'deploy.env'))) {
   process.exit(1);
 }
 
-run('node', [join(root, 'scripts/bump-deploy-version.mjs')]);
 run('npm', ['run', 'build', '--prefix', root]);
 
 const bashScript =
@@ -30,4 +29,4 @@ const bashScript =
     ? join(root, 'scripts/quick-deploy.sh')
     : join(root, 'scripts/deploy.sh');
 
-run('bash', [bashScript, '--no-bump', ...extraArgs]);
+run('bash', [bashScript, ...extraArgs]);

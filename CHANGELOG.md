@@ -12,7 +12,7 @@ Repository: [github.com/patricktd/MatterCameras](https://github.com/patricktd/Ma
 
 ## System overview
 
-**MatterCameras** is a bridge that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** devices (type `0x0142`) on a Matter hub — primarily **SmartThings** (Aeotec Hub v2) and other compatible controllers.
+**MatterCameras** is a bridge that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** devices (type `0x0142`) on any Matter 1.5–capable hub or controller. **SmartThings** is the primary reference platform today; other ecosystems are supported at the Matter protocol level as they add camera support.
 
 ### Data flow
 
@@ -55,13 +55,15 @@ RTSP/ONVIF → go2rtc (WebRTC + snapshots) → Matter Bridge (matter.js 0.17) �
 
 ### Operational limits
 
-See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera counts, and bottlenecks (ffmpeg, hub TURN, ~50 bridged devices on SmartThings).
+See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera counts, and bottlenecks (ffmpeg, hub TURN, ~50 bridged devices per bridge on typical hubs).
 
 ---
 
 ## [Unreleased]
 
 ### Changed
+- **Documentation** — README, install guide, Matter feature docs, scaling, and Web UI copy now describe Matter hubs generically; SmartThings remains documented as the reference platform where behavior is hub-specific.
+- **Release versioning** — `npm run deploy` and `npm run quick-deploy` no longer auto-bump `package.json`. Use `npm run release` (patch), `release:minor`, or `release:major` when publishing to the community; update `CHANGELOG.md` and tag the release before deploy.
 - **Mechanical PTZ exposure** — the Matter PTZ cluster is advertised only after a successful capability probe (`ptzCapable: true`). UniFi Protect cameras are excluded. Endpoints that no longer qualify are recreated without PTZ on bridge startup (hub may still need **Recycle Matter binding** on fixed cameras to refresh SmartThings).
 - **Per-camera PTZ pan invert** — optional `ptzInvertPan` in `cameras.json` for SmartThings Android when pan is reversed vs iOS on the same camera.
 - **Reolink spotlight probe** — bridged light endpoints now require an active WhiteLed hardware check (`SetWhiteLed` + `GetWhiteLed` confirmation). NVR channels without a spotlight no longer get a phantom SmartThings light. The Web UI **checkbox** is hidden automatically when the probe marks the camera as not capable (`reolinkLightCapable: false`).

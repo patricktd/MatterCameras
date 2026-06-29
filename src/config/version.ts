@@ -3,7 +3,7 @@ import { join } from 'path';
 import { PROJECT_ROOT } from './paths.js';
 
 /** Single source of truth: package.json version (pre-1.0 beta).
- *  Bumped automatically (+0.0.1 patch) on each deploy — see scripts/bump-deploy-version.mjs */
+ *  Bumped manually via `npm run release` — see scripts/release-version.mjs */
 export const appVersion: string = JSON.parse(
     readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8'),
 ).version as string;

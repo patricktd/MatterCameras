@@ -1,4 +1,4 @@
-# Matter bridge behavior (SmartThings)
+# Matter bridge behavior
 
 How this project implements a **Matter Aggregator bridge** and how that compares to other Matter bridges (Aqara, Hue, etc.).
 
@@ -16,15 +16,14 @@ References:
 - [Espressif bridge PartsList discussion](https://github.com/espressif/esp-matter/issues/77)
 - [Google Home — Descriptor / PartsList](https://developers.home.google.com/matter/primer/device-data-model)
 
-## What SmartThings promises
+## What controllers expect
 
-Samsung documents third-party Matter bridges as:
+Matter hubs and apps that support third-party Matter bridges should:
 
-> When users commission Matter bridges to SmartThings, we … automatically onboard all bridged devices … We also continually synchronize with the bridge, so that if a user adds or removes a bridged device in your app, SmartThings responds immediately.
+1. Onboard all bridged devices when the bridge is commissioned.
+2. Monitor aggregator `PartsList` (and related descriptor changes) so new or removed bridged endpoints appear in the app without restarting the bridge.
 
-Source: [SmartThings blog — third-party Matter bridges](https://blog.smartthings.com/matter/unlocking-seamless-connectivity-smartthings-offers-support-for-third-party-matter-bridges/)
-
-That sync is implemented in **hub firmware** by subscribing to bridge descriptor changes (e.g. `PartsList`) and creating/updating child devices — not by restarting the bridge.
+How well each platform does this varies — see [Platform notes: SmartThings](#platform-notes-smartthings) below.
 
 ## How other bridges behave
 
@@ -33,7 +32,7 @@ Typical Zigbee/Wi-Fi Matter bridges (lights, plugs):
 1. User adds device in the vendor app.
 2. Bridge creates a **dynamic Matter endpoint** at runtime.
 3. Bridge updates **Aggregator `PartsList`** and sends an **attribute report** to subscribed hubs.
-4. SmartThings shows the new device within seconds — **no bridge reboot**.
+4. The hub app shows the new device within seconds — **no bridge reboot**.
 
 ## How MatterCameras works
 
@@ -44,27 +43,27 @@ Typical Zigbee/Wi-Fi Matter bridges (lights, plugs):
 | Add while paired | Runtime `aggregator.add()` + `PartsList` / `softwareVersion` announce; operator can use **Restart Required** when a manual bridge reload is desired |
 | Hub notification | `notifyHubStructureChange()` bumps `softwareVersion` and re-reports aggregator `PartsList` |
 
-### SmartThings creates one device per bridged endpoint
+### One child device per bridged endpoint
 
-At pairing, SmartThings walks the aggregator `PartsList` and creates a **child device for every Matter endpoint**, including empty placeholders. A “slot pool” of reserved camera endpoints therefore showed dozens of useless cameras in the app — **not viable**.
+At pairing, the hub walks the aggregator `PartsList` and typically creates a **child device for every Matter endpoint**, including empty placeholders. A “slot pool” of reserved camera endpoints therefore showed dozens of useless cameras in SmartThings — **not viable**.
 
 Only **real cameras** from `cameras.json` are exposed on the bridge.
 
 ### Why dynamically added cameras may not appear
 
-SmartThings builds its Matter **subscription paths** from the endpoint list seen at **first pairing** (e.g. only `2.*.*` … `7.*.*` for six cameras). When endpoint `8` is added later, the bridge updates `PartsList` and sends reports, but the hub often **does not subscribe** to the new endpoint and does not create a child device.
+Some hubs build Matter **subscription paths** from the endpoint list seen at **first pairing** (e.g. only `2.*.*` … `7.*.*` for six cameras). When endpoint `8` is added later, the bridge updates `PartsList` and sends reports, but the hub may **not subscribe** to the new endpoint and may not create a child device.
 
-This is a **SmartThings hub / Matter camera driver limitation**, not a bridge bug. Light bridges sync more reliably than Matter Camera (`0x0142`).
+This is a **controller / Matter camera driver limitation** on some platforms (observed on SmartThings), not a bridge bug. Light bridges often sync more reliably than Matter Camera (`0x0142`).
 
-**Workaround:** remove and re-pair the bridge after adding cameras (cameras stay in `data/cameras.json`). Adding cameras **before** the first SmartThings pairing avoids this for the initial roster.
+**Workaround:** remove and re-pair the bridge after adding cameras (cameras stay in `data/cameras.json`). Adding cameras **before** the first hub pairing avoids this for the initial roster.
 
 ### Why camera bridges can feel slower than light bridges
 
-1. **Matter Camera (`0x0142`)** is heavier than On/Off Light — SmartThings uses different edge drivers and profiling; first snapshot may take minutes.
+1. **Matter Camera (`0x0142`)** is heavier than On/Off Light — hubs use different drivers and profiling; first snapshot may take minutes.
 2. **Hub caching** — if `PartsList` reports are missed (e.g. during an old full-process restart), the hub keeps a stale roster until refresh or reprofile.
-3. **Samsung camera stack** — Matter camera support is newer than Matter switch/bridge; auto-sync is less consistent in practice than Samsung’s marketing implies.
+3. **Camera stack maturity** — Matter camera support is newer than Matter switch/bridge on many platforms; auto-sync is not always as seamless as vendor marketing implies.
 
-## If a new camera does not appear in SmartThings
+## If a new camera does not appear on the hub
 
 Bridge side (should appear in logs):
 
@@ -73,7 +72,7 @@ Adding bridged camera: Garagem (cam-…)
 Bridge structure: N camera(s), softwareVersion=30N, Matter endpoints=[…]
 ```
 
-Hub side (confirms SmartThings sees the endpoint):
+Hub side (confirms the controller sees the endpoint):
 
 ```
 CaptureSnapshot camera=cam-…
@@ -84,11 +83,25 @@ CaptureSnapshot camera=cam-…
 Try:
 
 1. After adding a camera in the Web UI, watch for bridge-side logs such as `Adding bridged camera` and `Bridge structure`.
-2. Open **MatterCameras Bridge** in SmartThings → pull down to refresh.
+2. Open **MatterCameras Bridge** in the hub app → pull down to refresh.
 3. Wait 2–5 minutes for card preview (hub polling).
 4. **Remove and re-pair the bridge** (cameras stay in `data/cameras.json`) — required if the hub paired before those cameras existed.
 5. Use **Restart Required** in the Web UI only as a last resort.
 
 ## Operational limits
 
-See [SCALING.md](SCALING.md) — SmartThings recommends staying under ~50 bridged Matter devices per bridge.
+See [SCALING.md](SCALING.md) — many Matter bridges recommend staying under ~50 bridged devices per aggregator for stable operation.
+
+---
+
+## Platform notes: SmartThings
+
+Samsung documents third-party Matter bridges as:
+
+> When users commission Matter bridges to SmartThings, we … automatically onboard all bridged devices … We also continually synchronize with the bridge, so that if a user adds or removes a bridged device in your app, SmartThings responds immediately.
+
+Source: [SmartThings blog — third-party Matter bridges](https://blog.smartthings.com/matter/unlocking-seamless-connectivity-smartthings-offers-support-for-third-party-matter-bridges/)
+
+In practice, SmartThings Matter **camera** endpoints sync less reliably than light bridges. SmartThings-specific quirks (subscription paths, edge drivers, reprofile) are covered in the sections above and in [MATTER-CAMERA.md](MATTER-CAMERA.md).
+
+Samsung recommends staying under ~**50** bridged Matter devices per bridge ([1Home reference](https://tr.docs.netlify.1home.io/docs/en/server/matter-bridge/apps/samsung-smartthings)).

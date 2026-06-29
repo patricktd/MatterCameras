@@ -10,13 +10,6 @@ fi
 # NEVER rsync these runtime paths from the workstation (see also docs/DEPLOY.md):
 #   data/cameras.json, data/config.json, data/go2rtc.yaml, data/matter-storage/, .env
 
-NO_BUMP=false
-for arg in "$@"; do
-    case "$arg" in
-        --no-bump) NO_BUMP=true ;;
-    esac
-done
-
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT_NODE="$ROOT"
 if command -v cygpath >/dev/null 2>&1; then
@@ -36,9 +29,9 @@ HOST="${DEPLOY_HOST}"
 USER="${DEPLOY_USER}"
 DEST="${DEPLOY_DIR}"
 
-if [ "$NO_BUMP" = false ]; then
-  node "${ROOT_NODE}/scripts/bump-deploy-version.mjs"
-  npm run build --prefix "${ROOT_NODE}"
+if [ ! -d "${ROOT}/dist" ]; then
+    echo "==> Building (dist/ missing)..."
+    npm run build --prefix "${ROOT_NODE}"
 fi
 
 DEPLOY_VERSION="$(node -e "const fs=require('fs'); const path=require('path'); const root=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); console.log(pkg.version);" "${ROOT_NODE}")"
