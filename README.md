@@ -44,6 +44,10 @@ Then open `http://<your-lan-ip>:3202`, pair the Matter QR in your hub app, and a
 
 **Full walkthrough:** [docs/INSTALL.md](docs/INSTALL.md) (pairing, camera providers, ports, troubleshooting, updates).
 
+## Video walkthrough
+
+**[Installation and pairing demo on YouTube](https://youtu.be/-iBD2aoOA4I)** — narrated in **Portuguese**. Turn on **subtitles (CC)** for a clear walkthrough in other languages.
+
 If LAN IP detection fails:
 
 ```bash
