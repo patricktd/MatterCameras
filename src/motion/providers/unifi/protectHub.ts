@@ -1,6 +1,5 @@
 import { Logger } from '@matter/general';
 import { ProtectApi } from 'unifi-protect';
-import { motionConfig } from '../../../config/motion.js';
 import { OnvifMotionDebouncer } from '../../../onvif/motionDebounce.js';
 import type { MotionObjectType } from '../../types.js';
 import type { ProtectTarget } from './protectTarget.js';
@@ -27,6 +26,7 @@ export async function attachProtectMotion(
     matterCameraId: string,
     target: ProtectTarget,
     motionObjectType: MotionObjectType,
+    holdMs: number,
     onActive: (active: boolean) => void,
     onPulse: () => void,
 ): Promise<void> {
@@ -79,7 +79,7 @@ export async function attachProtectMotion(
         matterCameraId,
         protectCameraId: target.cameraId,
         motionObjectType,
-        debouncer: new OnvifMotionDebouncer(motionConfig.unifiHoldMs, onActive, onPulse),
+        debouncer: new OnvifMotionDebouncer(holdMs, onActive, onPulse),
     });
 
     logger.info(

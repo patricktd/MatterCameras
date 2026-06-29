@@ -4,6 +4,7 @@ import { setBridgeEndpointCount } from '../config/version.js';
 import type { Camera } from '../types/index.js';
 import { countBridgedEndpoints } from '../matter/personSensorConfig.js';
 import { canCameraExposeReolinkLight } from '../matter/reolinkLightConfig.js';
+import { canCameraProbePtz } from '../matter/ptzConfig.js';
 import { markBridgeRestartRequired } from '../web/bridgeRestartState.js';
 
 export interface SyncReolinkLightCapabilityOptions {
@@ -71,6 +72,57 @@ export function scheduleReolinkLightCapabilityProbes(cameras: Camera[]): void {
     })();
 }
 
+export interface SyncPtzCapabilityOptions {
+    /** Re-run the PTZ probe even when a prior result is stored. */
+    force?: boolean;
+}
+
+export async function syncPtzCapability(
+    camera: Camera,
+    options: SyncPtzCapabilityOptions = {},
+): Promise<Camera> {
+    if (!canCameraProbePtz(camera)) {
+        if (camera.ptzCapable !== undefined) {
+            const cleared = await storage.updateCamera(camera.id, { ptzCapable: undefined });
+            return cleared ?? { ...camera, ptzCapable: undefined };
+        }
+        return camera;
+    }
+
+    const needsProbe = options.force || camera.ptzCapable === undefined;
+    if (!needsProbe) {
+        return camera;
+    }
+
+    const capable = await bridge.ptz.probeCapability(camera);
+    if (camera.ptzCapable === capable) return camera;
+
+    const updated = await storage.updateCamera(camera.id, { ptzCapable: capable });
+    return updated ?? { ...camera, ptzCapable: capable };
+}
+
+/** Probe PTZ support in the background for cameras without a stored result. */
+export function schedulePtzCapabilityProbes(cameras: Camera[]): void {
+    const pending = cameras.filter(
+        cam => canCameraProbePtz(cam) && cam.ptzCapable === undefined,
+    );
+    if (!pending.length) return;
+
+    void (async () => {
+        for (const cam of pending) {
+            try {
+                const updated = await syncPtzCapability(cam);
+                if (updated.ptzCapable !== cam.ptzCapable) {
+                    await bridge.addCamera(updated);
+                    bridge.startMotionDetection(updated);
+                }
+            } catch (error) {
+                console.warn(`Background PTZ probe failed camera=${cam.id}: ${error}`);
+            }
+        }
+    })();
+}
+
 export async function installCamera(config: Camera): Promise<Camera> {
     await storage.addCamera(config);
     let camera = storage.getCamera(config.id) ?? config;
@@ -78,6 +130,7 @@ export async function installCamera(config: Camera): Promise<Camera> {
         force: true,
         active: camera.reolinkLightEnabled === true,
     });
+    camera = await syncPtzCapability(camera, { force: true });
 
     setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.addCamera(camera);
@@ -107,17 +160,34 @@ export async function refreshCameraRuntime(existing: Camera, updated: Camera): P
         || updated.rtspUrl !== existing.rtspUrl
         || updated.reolinkLightEnabled !== existing.reolinkLightEnabled;
 
-    const camera = await syncReolinkLightCapability(updated, {
+    const forcePtzProbe = updated.reolinkChannel !== existing.reolinkChannel
+        || updated.reolinkHost !== existing.reolinkHost
+        || updated.reolinkHttpPort !== existing.reolinkHttpPort
+        || updated.reolinkUseHttps !== existing.reolinkUseHttps
+        || updated.username !== existing.username
+        || updated.password !== existing.password
+        || updated.rtspUrl !== existing.rtspUrl
+        || updated.onvifUrl !== existing.onvifUrl
+        || updated.ptzBackend !== existing.ptzBackend
+        || updated.ptzEnabled !== existing.ptzEnabled
+        || updated.manufacturer !== existing.manufacturer;
+
+    let camera = await syncReolinkLightCapability(updated, {
         force: forceReolinkProbe,
         active: updated.reolinkLightEnabled === true,
     });
+    camera = await syncPtzCapability(camera, { force: forcePtzProbe });
 
+    await bridge.addCamera(camera);
     await bridge.updateCamera(camera);
 
     const rtspChanged = camera.rtspUrl !== existing.rtspUrl;
     const motionChanged = camera.motionSource !== existing.motionSource
         || camera.personSensorEnabled !== existing.personSensorEnabled
+        || camera.personSensorHoldSec !== existing.personSensorHoldSec
         || camera.reolinkLightEnabled !== existing.reolinkLightEnabled
+        || camera.ptzCapable !== existing.ptzCapable
+        || camera.ptzEnabled !== existing.ptzEnabled
         || camera.onvifUrl !== existing.onvifUrl
         || camera.username !== existing.username
         || camera.password !== existing.password
@@ -130,7 +200,8 @@ export async function refreshCameraRuntime(existing: Camera, updated: Camera): P
         || camera.manufacturer !== existing.manufacturer;
 
     const endpointCountChanged = camera.personSensorEnabled !== existing.personSensorEnabled
-        || camera.reolinkLightEnabled !== existing.reolinkLightEnabled;
+        || camera.reolinkLightEnabled !== existing.reolinkLightEnabled
+        || camera.ptzCapable !== existing.ptzCapable;
 
     if (rtspChanged) {
         await bridge.go2rtc.removeStream(camera.id);

@@ -23,10 +23,10 @@ import {
     logoutProtect,
 } from '../cameraProviders/unifi/protectApi.js';
 import { patchCameraFromProtect, syncExistingProtectCameras } from '../cameraProviders/unifi/syncExisting.js';
-import { installCamera, refreshCameraRuntime, recycleCameraMatterBinding, scheduleReolinkLightCapabilityProbes } from './cameraInstall.js';
+import { installCamera, refreshCameraRuntime, recycleCameraMatterBinding, scheduleReolinkLightCapabilityProbes, schedulePtzCapabilityProbes } from './cameraInstall.js';
 import { markBridgeRestartRequired } from './bridgeRestartState.js';
 import { bridgeRestartingPageHtml } from './bridgeRestartingPage.js';
-import { parseCameraMotionFields, parseMotionSource } from '../motion/parseMotionForm.js';
+import { parseCameraMotionFields, parseMotionSource, sanitizeCameraMotionFields } from '../motion/parseMotionForm.js';
 import { setBridgeEndpointCount } from '../config/version.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from '../matter/personSensorConfig.js';
 
@@ -76,6 +76,7 @@ function resolveReturnToPath(raw: unknown): string {
 // Routes
 app.get('/', async (req, res) => {
     scheduleReolinkLightCapabilityProbes(storage.getCameras());
+    schedulePtzCapabilityProbes(storage.getCameras());
 
     const cameras = storage.getCameras().map(sanitizeCameraForPublic);
     const pairingInfo = await bridge.getPairingInfo();
@@ -192,6 +193,46 @@ app.get('/api/cameras/:id/snapshot', async (req, res) => {
         res.type('image/jpeg').send(Buffer.from(jpeg));
     } catch (error) {
         res.status(503).json({ error: String(error) });
+    }
+});
+
+/** Manual PTZ test — same directions as SmartThings d-pad (Reolink native API or ONVIF). */
+app.post('/api/cameras/:id/ptz/:direction', async (req, res) => {
+    const camera = storage.getCameras().find(c => c.id === req.params.id);
+    if (!camera) {
+        res.status(404).json({ error: 'Camera not found' });
+        return;
+    }
+
+    const direction = String(req.params.direction ?? '').toLowerCase();
+    const speed = Number(req.query.speed ?? req.body?.speed ?? 0.3);
+    const stopAfterMs = Number(req.query.stopAfterMs ?? req.body?.stopAfterMs ?? 400);
+
+    try {
+        const ok = await bridge.ptz.testDirection(camera, direction, speed, stopAfterMs);
+        if (!ok) {
+            res.status(503).json({ ok: false, error: 'PTZ move failed or unsupported direction' });
+            return;
+        }
+        res.json({ ok: true, direction, backend: camera.ptzBackend ?? 'auto' });
+    } catch (error) {
+        res.status(503).json({ ok: false, error: String(error) });
+    }
+});
+
+/** Probe PTZ capability without moving the camera. */
+app.get('/api/cameras/:id/ptz/probe', async (req, res) => {
+    const camera = storage.getCameras().find(c => c.id === req.params.id);
+    if (!camera) {
+        res.status(404).json({ error: 'Camera not found' });
+        return;
+    }
+
+    try {
+        const capable = await bridge.ptz.probeCapability(camera);
+        res.json({ ok: true, capable, backend: camera.ptzBackend ?? null });
+    } catch (error) {
+        res.status(503).json({ ok: false, error: String(error) });
     }
 });
 
@@ -458,7 +499,7 @@ app.post('/api/restart', (req, res) => {
 
 app.post('/api/cameras', async (req, res) => {
     try {
-        const motionFields = parseCameraMotionFields(req.body as Record<string, unknown>);
+        const motionFields = sanitizeCameraMotionFields(req.body as Record<string, unknown>);
         const config: Camera = {
             id: 'cam-' + Date.now(),
             name: req.body.name,
@@ -485,7 +526,7 @@ app.post('/api/cameras/:id', async (req, res) => {
             return;
         }
 
-        const motionFields = parseCameraMotionFields(req.body as Record<string, unknown>);
+        const motionFields = sanitizeCameraMotionFields(req.body as Record<string, unknown>);
         const updated = await storage.updateCamera(id, {
             name: req.body.name,
             rtspUrl: req.body.rtspUrl,
@@ -549,6 +590,7 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
         codec: existing.codec,
         motionSource: existing.motionSource ?? 'frame-diff',
         personSensorEnabled: existing.personSensorEnabled ?? false,
+        personSensorHoldSec: existing.personSensorHoldSec,
         reolinkLightEnabled: existing.reolinkLightEnabled ?? false,
         onvifUrl: existing.onvifUrl,
         username: existing.username,

@@ -62,25 +62,45 @@
         return inferred === 'reolink-native' || inferred === 'unifi-protect';
     }
 
-    function supportsReolinkLight(root) {
-        const capableAttr = root.dataset.reolinkLightCapable;
-        if (capableAttr === 'false') {
-            return false;
-        }
-
+    function supportsReolinkOptions(root) {
         const addSource = root.dataset.addSource || '';
         if (addSource === 'reolink') {
             return true;
         }
+        if (addSource === 'unifi-protect') {
+            return false;
+        }
 
         const manufacturer = root.querySelector('[name="manufacturer"]')?.value?.trim().toLowerCase() || '';
         const model = root.querySelector('[name="model"]')?.value?.trim().toLowerCase() || '';
+        if (includesAny(manufacturer, ['ubiquiti', 'unifi']) || includesAny(model, ['unifi'])) {
+            return false;
+        }
+
+        const protectHost = root.querySelector('[name="protectHost"]')?.value?.trim() || '';
+        const protectCameraId = root.querySelector('[name="protectCameraId"]')?.value?.trim() || '';
+        if (protectHost && protectCameraId) {
+            return false;
+        }
+
         if (includesAny(manufacturer, ['reolink']) || includesAny(model, ['reolink'])) {
             return true;
         }
 
         const inferred = inferAutoGroup(root);
         return inferred === 'reolink-native';
+    }
+
+    function supportsReolinkChannel(root) {
+        return supportsReolinkOptions(root);
+    }
+
+    function supportsReolinkLight(root) {
+        const capableAttr = root.dataset.reolinkLightCapable;
+        if (capableAttr === 'false') {
+            return false;
+        }
+        return supportsReolinkOptions(root);
     }
 
     function allowedMotionModes(root) {
@@ -119,6 +139,14 @@
         syncReolinkLightOption(root);
     }
 
+    function syncReolinkChannelOption(root) {
+        const group = root.querySelector('.motion-reolink-channel-group');
+        if (!group) return;
+
+        const capable = supportsReolinkChannel(root);
+        group.classList.toggle('hidden', !capable);
+    }
+
     function syncReolinkLightOption(root) {
         const group = root.querySelector('.motion-reolink-light-group');
         if (!group) return;
@@ -139,9 +167,15 @@
         const capable = supportsPersonSensor(root);
         group.classList.toggle('hidden', !capable);
 
+        const checkbox = group.querySelector('input[type="checkbox"][name="personSensorEnabled"]');
+        const holdRow = group.querySelector('.motion-person-sensor-hold');
+
         if (!capable) {
-            const checkbox = group.querySelector('input[type="checkbox"][name="personSensorEnabled"]');
             if (checkbox) checkbox.checked = false;
+        }
+
+        if (holdRow && checkbox) {
+            holdRow.classList.toggle('hidden', !capable || !checkbox.checked);
         }
     }
 
@@ -164,6 +198,7 @@
 
         syncPersonSensorOption(root);
         syncReolinkLightOption(root);
+        syncReolinkChannelOption(root);
     }
 
     function initMotionOptions() {
@@ -174,6 +209,8 @@
             select.addEventListener('change', sync);
             root.querySelectorAll('[name="protectHost"], [name="protectCameraId"], [name="manufacturer"]')
                 .forEach(input => input.addEventListener('input', sync));
+            const personCheckbox = root.querySelector('[name="personSensorEnabled"][type="checkbox"]');
+            personCheckbox?.addEventListener('change', sync);
             sync();
         });
     }
@@ -183,6 +220,7 @@
         initMotionOptions,
         supportsPersonSensor,
         supportsReolinkLight,
+        supportsReolinkChannel,
         setReolinkLightCapable,
     };
 }());

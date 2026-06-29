@@ -46,6 +46,8 @@ services:
       - ./public:/app/public:ro
     environment:
       - NODE_ENV=production
+      # matter.js log timestamps use the process timezone (Date.getHours(), not UTC).
+      - TZ=${TZ:-America/Sao_Paulo}
       - MATTER_STORAGE_PATH=/app/data/matter-storage
       - MATTER_HOST=${MATTER_HOST:-127.0.0.1}
       - MATTER_BIND_HOST=${MATTER_BIND_HOST:-${MATTER_HOST:-127.0.0.1}}

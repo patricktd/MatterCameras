@@ -83,6 +83,7 @@ export class StorageService {
         if (updates.motionSource !== undefined) camera.motionSource = updates.motionSource;
         if (updates.motionObjectType !== undefined) camera.motionObjectType = updates.motionObjectType;
         if (updates.personSensorEnabled !== undefined) camera.personSensorEnabled = updates.personSensorEnabled;
+        if (updates.personSensorHoldSec !== undefined) camera.personSensorHoldSec = updates.personSensorHoldSec;
         if (updates.reolinkLightEnabled !== undefined) camera.reolinkLightEnabled = updates.reolinkLightEnabled;
         if ('reolinkLightCapable' in updates) {
             if (updates.reolinkLightCapable === undefined) {
@@ -91,6 +92,15 @@ export class StorageService {
                 camera.reolinkLightCapable = updates.reolinkLightCapable;
             }
         }
+        if (updates.ptzEnabled !== undefined) camera.ptzEnabled = updates.ptzEnabled;
+        if ('ptzCapable' in updates) {
+            if (updates.ptzCapable === undefined) {
+                delete camera.ptzCapable;
+            } else {
+                camera.ptzCapable = updates.ptzCapable;
+            }
+        }
+        if (updates.ptzBackend !== undefined) camera.ptzBackend = updates.ptzBackend;
         if (updates.onvifUrl !== undefined) camera.onvifUrl = updates.onvifUrl;
         if (updates.username !== undefined) camera.username = updates.username;
         if (updates.password !== undefined) camera.password = updates.password;

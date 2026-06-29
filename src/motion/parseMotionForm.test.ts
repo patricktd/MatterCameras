@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { parseCameraMotionFields, parseMotionObjectType, parseOptionalBoolean } from './parseMotionForm.js';
+import { parseCameraMotionFields, parseMotionObjectType, parseOptionalBoolean, sanitizeCameraMotionFields } from './parseMotionForm.js';
 
 assert.equal(parseOptionalBoolean(true), true);
 assert.equal(parseOptionalBoolean('true'), true);
@@ -38,6 +38,7 @@ assert.equal(parseMotionObjectType('unknown'), 'any');
         motionSource: 'reolink-native',
         motionObjectType: 'any',
         personSensorEnabled: true,
+        personSensorHoldSec: undefined,
         reolinkLightEnabled: true,
         onvifUrl: undefined,
         username: 'admin',
@@ -70,6 +71,40 @@ assert.equal(parseMotionObjectType('unknown'), 'any');
 
     assert.equal(parsed.personSensorEnabled, true);
     assert.equal(parsed.reolinkLightEnabled, true);
+}
+
+{
+    const parsed = parseCameraMotionFields({
+        personSensorHoldSec: '90',
+        addSource: 'reolink',
+    });
+    assert.equal(parsed.personSensorHoldSec, 90);
+}
+
+{
+    const parsed = parseCameraMotionFields({
+        personSensorHoldSec: '2',
+        addSource: 'reolink',
+    });
+    assert.equal(parsed.personSensorHoldSec, 5);
+}
+
+{
+    const parsed = sanitizeCameraMotionFields({
+        motionSource: 'auto',
+        personSensorEnabled: 'true',
+        reolinkLightEnabled: 'true',
+        reolinkChannel: '2',
+        protectHost: '192.168.1.1',
+        protectCameraId: 'abc123',
+        addSource: 'unifi-protect',
+        manufacturer: 'Ubiquiti',
+    });
+
+    assert.equal(parsed.personSensorEnabled, true);
+    assert.equal(parsed.reolinkLightEnabled, false);
+    assert.equal(parsed.reolinkChannel, undefined);
+    assert.equal(parsed.protectHost, '192.168.1.1');
 }
 
 console.log('parseMotionForm.test.ts: ok');

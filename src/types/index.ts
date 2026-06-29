@@ -26,6 +26,8 @@ export interface Camera {
     motionObjectType?: MotionObjectType;
     /** Whether to expose a separate bridged person sensor for supported vendors. */
     personSensorEnabled?: boolean;
+    /** Seconds to keep the person presence sensor active after each detection pulse. */
+    personSensorHoldSec?: number;
     /** Whether to expose a separate bridged Reolink spotlight (WhiteLed) switch. */
     reolinkLightEnabled?: boolean;
     /** Set by hardware probe — false hides the spotlight option in the Web UI. */
@@ -54,6 +56,14 @@ export interface Camera {
     reolinkDeviceUid?: string;
     /** Whether the resolved source came from a Reolink NVR / Home Hub. */
     reolinkIsNvr?: boolean;
+    /** Whether to expose Matter mechanical PTZ (Reolink native API or ONVIF). */
+    ptzEnabled?: boolean;
+    /** Probed by install — camera responded to PTZ backend. */
+    ptzCapable?: boolean;
+    /** Force backend selection (`reolink` preferred for TrackMix). */
+    ptzBackend?: 'reolink' | 'onvif';
+    /** Negate Matter pan deltas before sending to the camera (SmartThings Android quirk). */
+    ptzInvertPan?: boolean;
     /** UniFi Protect controller hostname or IP. */
     protectHost?: string;
     /** UniFi Protect camera id (24-char hex from Protect UI/API). */

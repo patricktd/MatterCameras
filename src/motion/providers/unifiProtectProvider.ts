@@ -1,7 +1,9 @@
 import { Logger } from '@matter/general';
+import { resolvePersonSensorHoldMs } from '../../matter/personSensorConfig.js';
 import type { Camera } from '../../types/index.js';
 import type { MotionCallbacks, MotionContext, MotionProvider, ProviderMatch } from '../types.js';
-import { resolveMotionObjectType } from '../types.js';
+import { resolveMotionObjectType, wantsPersonMotion } from '../types.js';
+import { motionConfig } from '../../config/motion.js';
 import { attachProtectMotion, detachProtectMotion } from './unifi/protectHub.js';
 import { resolveProtectTarget } from './unifi/protectTarget.js';
 
@@ -39,10 +41,15 @@ export class UnifiProtectMotionProvider implements MotionProvider {
         this.stop(camera.id);
         this.#targets.set(camera.id, target);
 
+        const holdMs = wantsPersonMotion(camera)
+            ? resolvePersonSensorHoldMs(camera)
+            : motionConfig.unifiHoldMs;
+
         await attachProtectMotion(
             camera.id,
             target,
             resolveMotionObjectType(camera),
+            holdMs,
             callbacks.onActive,
             callbacks.onPulse,
         );

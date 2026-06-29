@@ -40,6 +40,7 @@ export function resolveProtectTarget(camera: Camera): ProtectTarget | null {
 }
 
 export function cameraLooksLikeUnifi(camera: Camera): boolean {
+    if (camera.addSource === 'unifi-protect') return true;
     if (camera.protectHost && camera.protectCameraId) return true;
     const m = (camera.manufacturer ?? '').toLowerCase();
     return m.includes('ubiquiti') || m.includes('unifi');

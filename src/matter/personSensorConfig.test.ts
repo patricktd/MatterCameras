@@ -5,12 +5,14 @@ import {
     buildCameraMotionCamera,
     buildPersonSensorMotionCamera,
     canCameraExposePersonSensor,
+    clampPersonSensorHoldSec,
     countBridgedEndpoints,
     expectedBridgedEndpointIds,
     finalizeCameraMotionSettings,
     isPersonSensorEndpointId,
     personSensorEndpointId,
     personSensorLabel,
+    resolvePersonSensorHoldMs,
     shouldExposePersonSensor,
 } from './personSensorConfig.js';
 
@@ -30,6 +32,10 @@ assert.equal(baseCameraIdFromPersonSensorId('cam-1'), null);
 assert.equal(personSensorLabel(reolinkCamera), 'Hallway Person Presence');
 assert.equal(canCameraExposePersonSensor(reolinkCamera), true);
 assert.equal(shouldExposePersonSensor(reolinkCamera), true);
+
+assert.equal(resolvePersonSensorHoldMs({}), 60_000);
+assert.equal(resolvePersonSensorHoldMs({ personSensorHoldSec: 120 }), 120_000);
+assert.equal(clampPersonSensorHoldSec(2), 5);
 
 assert.deepEqual(buildPersonSensorMotionCamera(reolinkCamera), {
     ...reolinkCamera,
@@ -56,6 +62,18 @@ assert.deepEqual(finalizeCameraMotionSettings({
     ...reolinkCamera,
     motionObjectType: 'any',
     personSensorEnabled: true,
+    personSensorHoldSec: 60,
+    reolinkLightEnabled: false,
+});
+
+assert.deepEqual(finalizeCameraMotionSettings({
+    ...reolinkCamera,
+    personSensorHoldSec: 180,
+}), {
+    ...reolinkCamera,
+    motionObjectType: 'any',
+    personSensorEnabled: true,
+    personSensorHoldSec: 180,
     reolinkLightEnabled: false,
 });
 
@@ -67,6 +85,7 @@ assert.deepEqual(finalizeCameraMotionSettings({
     ...reolinkCamera,
     motionObjectType: 'any',
     personSensorEnabled: true,
+    personSensorHoldSec: 60,
     reolinkLightEnabled: false,
     reolinkLightCapable: false,
 });

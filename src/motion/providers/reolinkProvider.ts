@@ -3,6 +3,8 @@ import { motionConfig } from '../../config/motion.js';
 import type { Camera } from '../../types/index.js';
 import type { MotionCallbacks, MotionContext, MotionObjectType, MotionProvider, ProviderMatch } from '../types.js';
 import { resolveMotionObjectType } from '../types.js';
+import { resolvePersonSensorHoldMs } from '../../matter/personSensorConfig.js';
+import { wantsPersonMotion } from '../types.js';
 import {
     cameraLooksLikeReolink,
     ReolinkClient,
@@ -15,6 +17,7 @@ interface ActivePoll {
     client: ReolinkClient;
     channel: number;
     motionObjectType: MotionObjectType;
+    holdMs: number;
     timer?: ReturnType<typeof setInterval>;
     holdTimer?: ReturnType<typeof setTimeout>;
     active: boolean;
@@ -75,6 +78,9 @@ export class ReolinkMotionProvider implements MotionProvider {
             client,
             channel: target.channel,
             motionObjectType: resolveMotionObjectType(camera),
+            holdMs: wantsPersonMotion(camera)
+                ? resolvePersonSensorHoldMs(camera)
+                : motionConfig.reolinkHoldMs,
             active: false,
             callbacks,
         };
@@ -127,6 +133,6 @@ export class ReolinkMotionProvider implements MotionProvider {
             if (!poll.active) return;
             poll.active = false;
             poll.callbacks.onActive(false);
-        }, motionConfig.reolinkHoldMs);
+        }, poll.holdMs);
     }
 }

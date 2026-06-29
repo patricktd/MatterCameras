@@ -1,5 +1,9 @@
 import type { MotionObjectType, MotionSource } from '../motion/types.js';
 import type { Camera } from '../types/index.js';
+import {
+    MAX_PERSON_SENSOR_HOLD_SEC,
+    MIN_PERSON_SENSOR_HOLD_SEC,
+} from '../matter/personSensorConfig.js';
 
 const MOTION_SOURCES = new Set<MotionSource>([
     'auto',
@@ -43,11 +47,18 @@ export function parseOptionalBoolean(raw: unknown): boolean | undefined {
     return undefined;
 }
 
+export function parsePersonSensorHoldSec(raw: unknown): number | undefined {
+    const n = parseOptionalInt(raw);
+    if (n === undefined) return undefined;
+    return Math.min(MAX_PERSON_SENSOR_HOLD_SEC, Math.max(MIN_PERSON_SENSOR_HOLD_SEC, n));
+}
+
 export function parseCameraMotionFields(body: Record<string, unknown>): Pick<
     Camera,
     | 'motionSource'
     | 'motionObjectType'
     | 'personSensorEnabled'
+    | 'personSensorHoldSec'
     | 'reolinkLightEnabled'
     | 'onvifUrl'
     | 'username'
@@ -85,6 +96,7 @@ export function parseCameraMotionFields(body: Record<string, unknown>): Pick<
         motionSource: parseMotionSource(body.motionSource),
         motionObjectType: 'any',
         personSensorEnabled: parseOptionalBoolean(body.personSensorEnabled ?? body.presenceSensorEnabled),
+        personSensorHoldSec: parsePersonSensorHoldSec(body.personSensorHoldSec),
         reolinkLightEnabled: parseOptionalBoolean(body.reolinkLightEnabled),
         onvifUrl: String(body.onvifUrl ?? '').trim() || undefined,
         username: String(body.username ?? '').trim() || undefined,
@@ -108,6 +120,63 @@ export function parseCameraMotionFields(body: Record<string, unknown>): Pick<
         protectCameraId: String(body.protectCameraId ?? '').trim() || undefined,
         addSource: addSources.has(addSourceRaw) ? addSourceRaw as Camera['addSource'] : undefined,
     };
+}
+
+function formSupportsReolinkOptions(
+    fields: Pick<Camera, 'addSource' | 'manufacturer' | 'model' | 'motionSource'>,
+): boolean {
+    if (fields.addSource === 'reolink') return true;
+    const manufacturer = (fields.manufacturer ?? '').toLowerCase();
+    if (manufacturer.includes('reolink')) return true;
+    return fields.motionSource === 'reolink-native';
+}
+
+function formSupportsUnifiOptions(
+    fields: Pick<Camera, 'addSource' | 'manufacturer' | 'protectHost' | 'protectCameraId'>,
+): boolean {
+    if (fields.addSource === 'unifi-protect') return true;
+    if (fields.protectHost && fields.protectCameraId) return true;
+    const manufacturer = (fields.manufacturer ?? '').toLowerCase();
+    return manufacturer.includes('ubiquiti') || manufacturer.includes('unifi');
+}
+
+/** Drop Reolink-only form fields when the camera is not a Reolink source. */
+export function stripNonReolinkMotionFields<T extends ReturnType<typeof parseCameraMotionFields>>(fields: T): T {
+    if (formSupportsReolinkOptions(fields)) {
+        return fields;
+    }
+
+    return {
+        ...fields,
+        reolinkLightEnabled: false,
+        reolinkChannel: undefined,
+        reolinkHost: undefined,
+        reolinkHttpPort: undefined,
+        reolinkUseHttps: undefined,
+        reolinkRtspPort: undefined,
+        reolinkProtocol: undefined,
+        reolinkStream: undefined,
+        reolinkDeviceUid: undefined,
+        reolinkIsNvr: undefined,
+    };
+}
+
+/** Drop UniFi-only form fields when the camera is not a Protect source. */
+export function stripNonUnifiMotionFields<T extends ReturnType<typeof parseCameraMotionFields>>(fields: T): T {
+    if (formSupportsUnifiOptions(fields)) {
+        return fields;
+    }
+
+    return {
+        ...fields,
+        protectHost: undefined,
+        protectCameraId: undefined,
+    };
+}
+
+export function sanitizeCameraMotionFields(body: Record<string, unknown>): ReturnType<typeof parseCameraMotionFields> {
+    const parsed = parseCameraMotionFields(body);
+    return stripNonUnifiMotionFields(stripNonReolinkMotionFields(parsed));
 }
 
 /** Labels for Web UI camera cards. */

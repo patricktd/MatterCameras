@@ -1,7 +1,22 @@
 import type { Camera } from '../types/index.js';
 import { cameraLooksLikeReolink } from '../motion/providers/reolink/reolinkClient.js';
 import { canCameraExposeReolinkLight, reolinkLightEndpointId, shouldExposeReolinkLight } from './reolinkLightConfig.js';
+
 const PERSON_SENSOR_ID_PREFIX = 'person-';
+
+export const DEFAULT_PERSON_SENSOR_HOLD_SEC = 60;
+export const MIN_PERSON_SENSOR_HOLD_SEC = 5;
+export const MAX_PERSON_SENSOR_HOLD_SEC = 600;
+
+export function clampPersonSensorHoldSec(seconds: number): number {
+    return Math.min(MAX_PERSON_SENSOR_HOLD_SEC, Math.max(MIN_PERSON_SENSOR_HOLD_SEC, Math.floor(seconds)));
+}
+
+/** Hold duration for person-only motion subscriptions (Reolink / UniFi person sensor). */
+export function resolvePersonSensorHoldMs(camera: Pick<Camera, 'personSensorHoldSec'>): number {
+    const seconds = camera.personSensorHoldSec ?? DEFAULT_PERSON_SENSOR_HOLD_SEC;
+    return clampPersonSensorHoldSec(seconds) * 1_000;
+}
 
 export function personSensorEndpointId(cameraId: string): string {
     return `${PERSON_SENSOR_ID_PREFIX}${cameraId}`;
@@ -75,6 +90,9 @@ export function finalizeCameraMotionSettings(camera: Camera): Camera {
         motionObjectType: 'any',
         personSensorEnabled,
         reolinkLightEnabled,
+        personSensorHoldSec: personSensorEnabled
+            ? clampPersonSensorHoldSec(camera.personSensorHoldSec ?? DEFAULT_PERSON_SENSOR_HOLD_SEC)
+            : camera.personSensorHoldSec,
     };
 
     if (!canCameraExposeReolinkLight(camera)) {

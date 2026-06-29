@@ -358,12 +358,45 @@ export class ReolinkClient {
         if (!matched) return null;
         return this.getWhiteLedState(channel).catch(() => null);
     }
+
+    /** Reolink native PTZ — more reliable than ONVIF AbsoluteMove on TrackMix and similar models. */
+    async ptzCtrl(channel: number, op: string, speed?: number): Promise<boolean> {
+        const result = await this.ptzCtrlResult(channel, op, speed);
+        return result.ok;
+    }
+
+    async ptzCtrlResult(channel: number, op: string, speed?: number): Promise<{ ok: boolean; error?: string }> {
+        await this.ensureAuth();
+        const param: Record<string, unknown> = { channel, op };
+        if (speed !== undefined) param.speed = Math.max(1, Math.min(63, Math.round(speed)));
+
+        const rows = await reolinkFetch(this.#host, {
+            cmd: 'PtzCtrl',
+            ...this.#auth!,
+        }, {
+            method: 'POST',
+            body: [{ cmd: 'PtzCtrl', action: 0, param }],
+        }, this.#connection);
+
+        if (reolinkCommandSucceeded(rows)) {
+            return { ok: true };
+        }
+        return { ok: false, error: reolinkCommandError(rows) };
+    }
 }
 
 export function reolinkCommandSucceeded(rows: ReolinkResponse[]): boolean {
     const row = rows[0];
     if (!row) return false;
     return row.code === undefined || row.code === 0;
+}
+
+export function reolinkCommandError(rows: ReolinkResponse[]): string | undefined {
+    const row = rows[0];
+    if (!row) return 'empty response';
+    if (row.code === undefined || row.code === 0) return undefined;
+    const detail = row.error?.detail?.trim();
+    return detail || `code ${row.code}`;
 }
 
 function extractToken(rows: ReolinkResponse[]): string | undefined {

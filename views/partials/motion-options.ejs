@@ -1,5 +1,6 @@
 <% const motionValue = typeof selectedMotion !== 'undefined' ? selectedMotion : 'auto'; %>
 <% const personSensorEnabledValue = typeof selectedPersonSensorEnabled !== 'undefined' ? selectedPersonSensorEnabled : false; %>
+<% const personSensorHoldSecValue = typeof selectedPersonSensorHoldSec !== 'undefined' ? selectedPersonSensorHoldSec : 60; %>
 <% const reolinkLightEnabledValue = typeof selectedReolinkLightEnabled !== 'undefined' ? selectedReolinkLightEnabled : false; %>
 <% const reolinkLightCapableAttr = typeof reolinkLightCapable === 'boolean' ? String(reolinkLightCapable) : ''; %>
 <% const motionAddSource = typeof addSource !== 'undefined' ? addSource : ''; %>
@@ -41,6 +42,18 @@
                 Expose separate person presence sensor via Matter
             </span>
         </label>
+
+        <div class="motion-person-sensor-hold<%= personSensorEnabledValue ? '' : ' hidden' %>">
+            <label for="<%= idPrefix %>-person-sensor-hold">Presence hold time</label>
+            <select id="<%= idPrefix %>-person-sensor-hold" name="personSensorHoldSec" class="person-sensor-hold-select">
+                <option value="30" <%= personSensorHoldSecValue === 30 ? 'selected' : '' %>>30 seconds</option>
+                <option value="60" <%= personSensorHoldSecValue === 60 ? 'selected' : '' %>>60 seconds (default)</option>
+                <option value="90" <%= personSensorHoldSecValue === 90 ? 'selected' : '' %>>90 seconds</option>
+                <option value="120" <%= personSensorHoldSecValue === 120 ? 'selected' : '' %>>2 minutes</option>
+                <option value="180" <%= personSensorHoldSecValue === 180 ? 'selected' : '' %>>3 minutes</option>
+                <option value="300" <%= personSensorHoldSecValue === 300 ? 'selected' : '' %>>5 minutes</option>
+            </select>
+        </div>
     </div>
 
     <div class="motion-field-group motion-reolink-light-group hidden">
@@ -55,7 +68,7 @@
         </label>
     </div>
 
-    <div class="motion-field-group" data-show-for="reolink-native auto">
+    <div class="motion-field-group motion-reolink-channel-group hidden">
         <p class="motion-group-label">Reolink</p>
         <label for="<%= idPrefix %>-reolink-ch">Channel (NVR)</label>
         <input type="number" id="<%= idPrefix %>-reolink-ch" name="reolinkChannel" min="0" max="31"

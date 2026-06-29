@@ -63,14 +63,21 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 
 ### Changed
 - **Mechanical PTZ exposure** — the Matter PTZ cluster is advertised only after a successful capability probe (`ptzCapable: true`). UniFi Protect cameras are excluded. Endpoints that no longer qualify are recreated without PTZ on bridge startup (hub may still need **Recycle Matter binding** on fixed cameras to refresh SmartThings).
+- **Per-camera PTZ pan invert** — optional `ptzInvertPan` in `cameras.json` for SmartThings Android when pan is reversed vs iOS on the same camera.
 - **Reolink spotlight probe** — bridged light endpoints now require an active WhiteLed hardware check (`SetWhiteLed` + `GetWhiteLed` confirmation). NVR channels without a spotlight no longer get a phantom SmartThings light. The Web UI **checkbox** is hidden automatically when the probe marks the camera as not capable (`reolinkLightCapable: false`).
 - **Windows deploy (ARM64)** — `deploy.ps1` / `quick-deploy.ps1` sync with Git `tar` + OpenSSH instead of `rsync` (MSYS2 rsync segfaults under Git Bash on ARM Windows). SSH **multiplexing** (`ControlMaster`) prompts for the password once per run. `npm run deploy` routes to the PowerShell wrappers on `win32`.
 - **Person detection vs camera motion** — the Matter camera endpoint always uses generic motion (`auto` → vendor native → ONVIF → frame diff). Person detection is only available via the optional **person presence sensor** checkbox (Reolink / UniFi Protect). Legacy `motionObjectType: person` on the camera record is migrated to the separate sensor on save.
 
 ### Fixed
+- **Android `mptzSetPosition` tracking** — hub state no longer advances on preset no-ops; zoom preset slots (`zoom=11`) and encoded tilt (`50–90`) are stripped before delta calculation.
+- **iOS/Android PTZ stops while holding** — SmartThings hub 61.x uses virtual-stick `mptzSetPosition` (±10); bridge now pulses on each repeat instead of no-op delta tracking.
+- **Android PTZ pan inverted** — `mptzRelativeMove` pan is negated (Android mirrors pan vs iOS `mptzSetPosition` on hub 61.x); setPosition stick path unchanged for iOS.
+- **Android PTZ inverted / preset jumps** — `mptzSetPosition` ignores preset jumps and zoom slots, uses dominant axis on diagonals.
+- **iOS PTZ sluggish** — restored standard Reolink pulse duration (quick mode was too short).
+- **NVR PTZ (E1 on Home Hub)** — `PtzCtrl` probe, pre-`Stop` on NVR hosts, retry without speed, log API rejection reason.
 - **UniFi edit form** — Reolink spotlight and NVR channel fields no longer appear inside the person-sensor section when editing UniFi Protect cameras.
 - **PTZ on non-PTZ cameras** — UniFi and other fixed cameras no longer inherit a PTZ cluster from the generic bridged camera device type.
-- **SmartThings “saved as preset” toast** — the bridge no longer updates the Matter `mptzPosition` attribute after each move (position is tracked internally for delta moves).
+- **SmartThings “saved as preset” toast** — the bridge does not update `mptzPosition` after moves; the Android app still shows the toast when it invokes `mptzSetPosition` (not fixable on the bridge).
 - **Reolink WhiteLed probe regression** — passive `GetWhiteLed` checks no longer toggle the spotlight on startup, dashboard load, or person-sensor saves. Active hardware verification runs only when the bridged light is enabled. Reduces RTSP/WebRTC disruption on standalone Reolink cameras.
 - **Live view first-attempt failures** — `ProvideOffer` now pre-warms the go2rtc transcode for every hub offer (not only compact/Android), reducing first-open timeouts.
 - **Live view slow opens (regression)** — removed blocking ffmpeg pre-warm inside `ProvideOffer` (was adding ~8s before every hub offer after the 2-minute warm window). Pre-warm now runs in the background; startup + periodic refresh keep transcoders hot without delaying signaling.

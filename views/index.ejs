@@ -66,7 +66,7 @@
                                 <p class="camera-meta"><%= motionLabel %></p>
                             <% } %>
                             <% if (cam.personSensorEnabled) { %>
-                                <p class="camera-meta">Person presence sensor enabled</p>
+                                <p class="camera-meta">Person presence sensor enabled<% if (cam.personSensorHoldSec) { %> (hold <%= cam.personSensorHoldSec %>s)<% } %></p>
                             <% } %>
                             <% if (cam.reolinkLightEnabled) { %>
                                 <p class="camera-meta">Reolink spotlight enabled</p>
@@ -107,6 +107,7 @@
                                         idPrefix: 'edit-' + cam.id,
                                         selectedMotion: cam.motionSource || 'frame-diff',
                                         selectedPersonSensorEnabled: cam.personSensorEnabled || false,
+                                        selectedPersonSensorHoldSec: cam.personSensorHoldSec || 60,
                                         selectedReolinkLightEnabled: cam.reolinkLightEnabled || false,
                                         reolinkLightCapable: cam.reolinkLightCapable,
                                         addSource: cam.addSource || '',
@@ -135,7 +136,7 @@
                                 <% if (isCommissioned) { %>
                                 <form action="/api/cameras/<%= cam.id %>/recycle-matter" method="POST" style="display:inline;"
                                     onsubmit="return confirm('Reset SmartThings binding for <%= cam.name %>? Remove this camera (and any person/light child) from SmartThings first, then confirm.');">
-                                    <button type="submit" class="btn btn-secondary btn-sm">Reset ST binding</button>
+                                    <button type="submit" class="btn btn-secondary btn-sm">Reset Binding</button>
                                 </form>
                                 <% } %>
                                 <button type="button" class="btn btn-secondary btn-sm btn-cancel">Cancel</button>

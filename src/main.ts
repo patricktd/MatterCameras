@@ -9,7 +9,7 @@ import { setBridgeEndpointCount, appVersion } from './config/version.js';
 import { streamContext } from './matter/behaviors/streamContext.js';
 import { getMatterStoragePath, wipeMatterStorage } from './matter/matterStorage.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from './matter/personSensorConfig.js';
-import { scheduleReolinkLightCapabilityProbes } from './web/cameraInstall.js';
+import { scheduleReolinkLightCapabilityProbes, schedulePtzCapabilityProbes, syncPtzCapability } from './web/cameraInstall.js';
 
 let staleRecoveryInProgress = false;
 
@@ -114,8 +114,12 @@ async function main() {
     await bridge.go2rtc.waitUntilReady();
 
     const cameras = storage.getCameras();
-    setBridgeEndpointCount(countBridgedEndpoints(cameras));
-    const knownIds = expectedBridgedEndpointIds(cameras);
+    for (const cam of cameras) {
+        await syncPtzCapability(cam);
+    }
+    const camerasAfterPtzProbe = storage.getCameras();
+    setBridgeEndpointCount(countBridgedEndpoints(camerasAfterPtzProbe));
+    const knownIds = expectedBridgedEndpointIds(camerasAfterPtzProbe);
     const orphans = bridge.listOrphanBridgedCameraIds(knownIds);
     if (orphans.length > 0) {
         console.warn(
@@ -123,7 +127,7 @@ async function main() {
             + `${orphans.join(', ')} — SmartThings may show cameras without preview until removed`,
         );
     }
-    for (const cam of cameras) {
+    for (const cam of camerasAfterPtzProbe) {
         await bridge.addCamera(cam);
         await bridge.go2rtc.addStream(cam.id, cam.name, cam.rtspUrl);
     }
@@ -134,6 +138,7 @@ async function main() {
     await bridge.go2rtc.prewarmAllWebRtc();
 
     scheduleReolinkLightCapabilityProbes(storage.getCameras());
+    schedulePtzCapabilityProbes(storage.getCameras());
 
     // Start Matter only after cameras are on the aggregator (avoids hub seeing empty partsList).
     try {
@@ -150,11 +155,11 @@ async function main() {
     }
 
     // Motion polls go2rtc JPEG frames — must run only after every stream is registered.
-    for (const cam of cameras) {
+    for (const cam of camerasAfterPtzProbe) {
         const camera = storage.getCamera(cam.id) ?? cam;
         bridge.startMotionDetection(camera);
     }
-    console.log(`Motion detection active for ${cameras.length} camera(s)`);
+    console.log(`Motion detection active for ${camerasAfterPtzProbe.length} camera(s)`);
 
     bridge.go2rtc.startPeriodicPrune();
     bridge.go2rtc.startPeriodicPrewarm();

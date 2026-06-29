@@ -9,9 +9,10 @@ import { Camera } from '../types/index.js';
 import { Go2RTCClient } from '../streaming/Go2RTCClient.js';
 import { MotionDetectionService } from '../streaming/MotionDetectionService.js';
 import { ReolinkLightService } from '../streaming/ReolinkLightService.js';
+import { PtzService } from '../streaming/PtzService.js';
 import { streamContext } from './behaviors/streamContext.js';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
-import { BridgedCameraDevice, bridgedCameraOptions } from './devices/BridgedCameraDevice.js';
+import { BridgedCameraDevice, bridgedCameraDeviceType, bridgedCameraOptions, MatterCameraAvSettingsUserLevelManagementServer } from './devices/BridgedCameraDevice.js';
 import { BridgedPersonSensorDevice, bridgedPersonSensorOptions } from './devices/BridgedPersonSensorDevice.js';
 import { BridgedReolinkLightDevice, bridgedReolinkLightOptions } from './devices/BridgedReolinkLightDevice.js';
 import { BasicInformationServer } from '@matter/main/behaviors/basic-information';
@@ -33,6 +34,7 @@ import {
     reolinkLightLabel,
     shouldExposeReolinkLight,
 } from './reolinkLightConfig.js';
+import { shouldExposePtz } from './ptzConfig.js';
 import { OccupancySensing } from '@matter/types/clusters/occupancy-sensing';
 import { OccupancySensingServer } from '@matter/node/behaviors/occupancy-sensing';
 import { OnOffServer } from '@matter/node/behaviors/on-off';
@@ -57,6 +59,7 @@ export class MatterBridge {
     readonly go2rtc: Go2RTCClient;
     readonly motionDetection = new MotionDetectionService();
     readonly reolinkLight = new ReolinkLightService();
+    readonly ptz = new PtzService();
 
     constructor() {
         this.go2rtc = new Go2RTCClient(appConfig.go2rtcUrl);
@@ -202,6 +205,10 @@ export class MatterBridge {
 
         const existing = this.aggregator.parts.get(camera.id);
         if (existing) {
+            if (this.#cameraEndpointPtzMismatch(existing, camera)) {
+                await this.#recreateCameraEndpoint(camera);
+                return;
+            }
             this.cameraEndpoints.set(camera.id, existing);
             console.log(`Camera ${camera.name} (${camera.id}) already on aggregator`);
             if (shouldExposePersonSensor(camera)) {
@@ -234,10 +241,57 @@ export class MatterBridge {
 
         console.log(`Adding bridged camera: ${camera.name} (${camera.id})`);
         const endpoint = await this.aggregator.add(
-            BridgedCameraDevice,
+            bridgedCameraDeviceType(camera),
             bridgedCameraOptions(camera),
         );
         this.cameraEndpoints.set(camera.id, endpoint);
+
+        if (shouldExposePersonSensor(camera)) {
+            await this.#addPersonSensor(camera);
+        }
+        if (shouldExposeReolinkLight(camera)) {
+            await this.#ensureReolinkLight(camera);
+        }
+
+        if (this.started) {
+            await this.notifyHubStructureChange();
+        }
+    }
+
+    #cameraEndpointPtzMismatch(endpoint: Endpoint, camera: Camera): boolean {
+        const wantsPtz = shouldExposePtz(camera);
+        let hasPtz = false;
+        try {
+            hasPtz = endpoint.stateOf(MatterCameraAvSettingsUserLevelManagementServer) !== undefined;
+        } catch {
+            hasPtz = false;
+        }
+        return wantsPtz !== hasPtz;
+    }
+
+    async #recreateCameraEndpoint(camera: Camera): Promise<void> {
+        const id = camera.id;
+        const endpoint = this.cameraEndpoints.get(id) ?? this.aggregator?.parts.get(id);
+        if (!endpoint || !this.aggregator) return;
+
+        console.log(
+            `Recreating bridged camera endpoint camera=${camera.name} (${id}) `
+            + `ptz=${shouldExposePtz(camera)}`,
+        );
+        this.motionDetection.stopCamera(id);
+        this.motionDetection.stopCamera(`person-${id}`);
+        this.reolinkLight.stop(id);
+        this.ptz.stop(id);
+        await this.#removePersonSensor(id);
+        await this.#removeReolinkLight(id);
+        await endpoint.delete();
+        this.cameraEndpoints.delete(id);
+
+        const recreated = await this.aggregator.add(
+            bridgedCameraDeviceType(camera),
+            bridgedCameraOptions(camera),
+        );
+        this.cameraEndpoints.set(id, recreated);
 
         if (shouldExposePersonSensor(camera)) {
             await this.#addPersonSensor(camera);
@@ -335,6 +389,15 @@ export class MatterBridge {
             this.motionDetection.stopCamera(`person-${camera.id}`);
         }
         void this.#syncReolinkLightRuntime(camera);
+        this.#syncPtzRuntime(camera);
+    }
+
+    #syncPtzRuntime(camera: Camera): void {
+        if (shouldExposePtz(camera)) {
+            this.ptz.start(camera);
+        } else {
+            this.ptz.stop(camera.id);
+        }
     }
 
     async #syncReolinkLightRuntime(camera: Camera): Promise<void> {
@@ -357,6 +420,7 @@ export class MatterBridge {
         this.motionDetection.stopCamera(id);
         this.motionDetection.stopCamera(`person-${id}`);
         this.reolinkLight.stop(id);
+        this.ptz.stop(id);
         await this.#removePersonSensor(id);
         await this.#removeReolinkLight(id);
         await endpoint.delete();
@@ -383,6 +447,7 @@ export class MatterBridge {
         this.motionDetection.stopCamera(id);
         this.motionDetection.stopCamera(`person-${id}`);
         this.reolinkLight.stop(id);
+        this.ptz.stop(id);
         await this.#removePersonSensor(id);
         await this.#removeReolinkLight(id);
         await endpoint.delete();
