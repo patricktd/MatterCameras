@@ -1,0 +1,22 @@
+name: ci
+
+# Cheap insurance: install, run the test suite, and type-check/build on every
+# push and pull request. Keeps releases from shipping a broken dist/.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

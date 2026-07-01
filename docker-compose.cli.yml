@@ -1,0 +1,50 @@
+# Matter Cameras Bridge: pre-built images (GHCR), configured via .env on the CLI.
+#
+# Copy .env.cli.example to .env, set LAN_IP, then:
+#   docker compose -f docker-compose.cli.yml up -d
+# (or inline: LAN_IP=192.168.1.50 docker compose -f docker-compose.cli.yml up -d)
+#
+# Everything is env-driven: image coordinates (REGISTRY/IMAGE_OWNER/IMAGE_TAG),
+# LAN_IP, ports. For CasaOS/Portainer use docker-compose.casaos.yml instead.
+#
+# Requires Linux with host networking (Matter mDNS on UDP 5353).
+# Ports: 3202 Web UI, 3203 go2rtc, 5550 Matter, 8554 RTSP, 8555 WebRTC, 5353 mDNS
+
+services:
+  go2rtc:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-patricktd}/${GO2RTC_IMAGE:-matter-go2rtc}:${IMAGE_TAG:-latest}
+    container_name: matter_go2rtc
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - LAN_IP=${LAN_IP:?Set LAN_IP to this machine's LAN IPv4 (e.g. 192.168.1.50), not 127.0.0.1}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3203/api"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-patricktd}/${APP_IMAGE:-mattercameras}:${IMAGE_TAG:-latest}
+    container_name: matter_cameras
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - mattercam_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - TZ=${TZ:-America/Sao_Paulo}
+      - MATTER_STORAGE_PATH=/app/data/matter-storage
+      - MATTER_HOST=${LAN_IP:?Set LAN_IP to this machine's LAN IPv4 (e.g. 192.168.1.50), not 127.0.0.1}
+      - MATTER_BIND_HOST=${MATTER_BIND_HOST:-${LAN_IP}}
+      - MATTER_PORT=${MATTER_PORT:-5550}
+      - WEB_PORT=${WEB_PORT:-3202}
+      - GO2RTC_URL=${GO2RTC_URL:-http://127.0.0.1:3203}
+      - GITHUB_REPO=${GITHUB_REPO:-patricktd/MatterCameras}
+    depends_on:
+      go2rtc:
+        condition: service_healthy
+
+volumes:
+  mattercam_data:

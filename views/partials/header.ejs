@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Matter Cameras Bridge — <%= typeof pageTitle !== 'undefined' ? pageTitle : 'Dashboard' %></title>
+    <link rel="icon" type="image/png" href="/images/logo.png">
     <link rel="stylesheet" href="/css/dashboard.css">
     <% if (typeof extraStylesheets !== 'undefined' && Array.isArray(extraStylesheets)) { %>
         <% extraStylesheets.forEach(stylesheet => { %>
@@ -17,7 +18,7 @@
     <div class="container">
         <header>
             <div class="header-title">
-                <h1><a href="/" class="header-home-link">Matter Cameras Bridge</a></h1>
+                <h1><a href="/" class="header-home-link"><img src="/images/logo.png" alt="" class="header-logo">Matter Cameras Bridge</a></h1>
                 <% if (typeof pageTitle !== 'undefined' && pageTitle !== 'Dashboard') { %>
                     <span class="header-page-title"><%= pageTitle %></span>
                 <% } %>

@@ -1,0 +1,77 @@
+# Matter Cameras Bridge: pre-built images (GHCR) for CasaOS / Portainer.
+#
+# Import this file, then EDIT these values in the app's settings:
+#   - LAN_IP (go2rtc) and MATTER_HOST (app): this machine's LAN IPv4
+#     (e.g. 192.168.1.50), NOT 127.0.0.1, or Matter pairing and WebRTC will not work.
+#   - the two image: lines: change patricktd to your GitHub user to run a fork's images.
+#
+# No .env / variables: CasaOS and Portainer do not read a .env file, so every value
+# is concrete. Requires Linux with host networking (Matter mDNS on UDP 5353).
+# Ports: 3202 Web UI, 3203 go2rtc, 5550 Matter, 8554 RTSP, 8555 WebRTC, 5353 mDNS
+
+services:
+  go2rtc:
+    image: ghcr.io/patricktd/matter-go2rtc:latest
+    container_name: matter_go2rtc
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - LAN_IP=192.168.1.50   # <-- change to this machine's LAN IPv4
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3203/api"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app:
+    image: ghcr.io/patricktd/mattercameras:latest
+    container_name: matter_cameras
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - mattercam_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - TZ=America/Sao_Paulo
+      - MATTER_STORAGE_PATH=/app/data/matter-storage
+      - MATTER_HOST=192.168.1.50   # <-- same LAN IPv4 as go2rtc above
+      - WEB_PORT=3202
+      - GO2RTC_URL=http://127.0.0.1:3203
+    depends_on:
+      go2rtc:
+        condition: service_healthy
+    x-casaos:
+      envs:
+        - container: MATTER_HOST
+          description:
+            en_us: This machine's LAN IPv4 (e.g. 192.168.1.50), not 127.0.0.1.
+      ports:
+        - container: "3202"
+          description:
+            en_us: Web UI
+
+volumes:
+  mattercam_data:
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: app
+  author: patricktd
+  developer: patricktd
+  category: Smart Home
+  description:
+    en_us: Bridge that exposes RTSP/ONVIF cameras as Matter 1.5 camera endpoints for Matter hubs.
+  tagline:
+    en_us: RTSP/ONVIF cameras as Matter 1.5 cameras.
+  title:
+    custom: Matter Cameras Bridge
+  icon: https://github.com/patricktd/MatterCameras/blob/main/public/images/logo.png?raw=true
+  scheme: http
+  hostname: ""
+  port_map: "3202"
+  index: /
+  is_uncontrolled: false
+  store_app_id: mattercameras

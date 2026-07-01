@@ -69,6 +69,15 @@ header {
 .header-home-link {
     color: inherit;
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-logo {
+    height: 2.6rem;
+    width: auto;
+    display: block;
 }
 
 .header-home-link:hover {

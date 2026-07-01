@@ -1,0 +1,136 @@
+name: release
+# Show the version (tag) or the chosen bump in the Actions run list.
+run-name: release ${{ github.event_name == 'workflow_dispatch' && inputs.bump || github.ref_name }}
+
+# Publishes multi-arch images to GHCR and creates the GitHub Release.
+# Fork-agnostic: it always publishes under the repo's own owner/namespace,
+# so it works on a fork and upstream alike.
+#
+# Two ways to trigger:
+#   1) Button — Actions tab → "release" → "Run workflow" → pick patch/minor/major.
+#      Runs entirely on GitHub: bumps the version, moves the CHANGELOG, commits,
+#      tags, then builds + publishes + creates the Release. No local Docker/gh.
+#   2) CLI — `node scripts/release-version.mjs <patch|minor|major> --publish`
+#      bumps + pushes a tag locally; the pushed v* tag triggers this workflow.
+#
+# NOTE: GHCR packages are PRIVATE by default. After the first successful run,
+# open each package on GitHub and set its visibility to Public so users can pull.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump (ignored for tag-triggered runs)'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Button runs on the main branch (so we can commit/tag/push); a tag push
+          # checks out the tag itself.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Button-only: bump version, move CHANGELOG, commit, tag, push. --no-verify
+      # skips the clean-tree / branch / gh-auth checks that only make sense locally.
+      # The tag is pushed with GITHUB_TOKEN, which by design does NOT re-trigger the
+      # `on: push: tags` job (GitHub blocks recursive runs), so this dispatch run is
+      # the only build — it continues to build & publish below. No double publish.
+      - name: Bump, changelog, tag & push
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node scripts/release-version.mjs "${{ inputs.bump }}" --publish --no-verify
+
+      # Tag = the git tag itself on a tag push (correct even for a tag created by
+      # hand); on the button path it comes from package.json, which the step above
+      # just bumped.
+      - name: Resolve version & owner
+        id: meta
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # App image (Node). arm64 rebuilds native modules under QEMU; if this step
+      # becomes too slow/flaky, drop arm64 from `platforms` here for the app only.
+      - name: Build & push app image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ steps.meta.outputs.tag }}
+            VCS_REF=${{ steps.meta.outputs.sha }}
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/mattercameras:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/mattercameras:latest
+
+      # Patched go2rtc (Go, CGO_ENABLED=0 → cross-compiles cleanly for both arches).
+      - name: Build & push go2rtc image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/go2rtc
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/matter-go2rtc:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/matter-go2rtc:latest
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          NOTES="$(node scripts/release-version.mjs --notes "$TAG")"
+          PRERELEASE=""
+          case "$TAG" in *-*) PRERELEASE="--prerelease" ;; esac
+          if ! gh release create "$TAG" --title "$TAG" --notes "$NOTES" $PRERELEASE; then
+            # Tolerate only the idempotent "already released" case; fail on real errors.
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release $TAG already exists — skipping creation."
+            else
+              echo "::error::gh release create failed for $TAG"
+              exit 1
+            fi
+          fi

@@ -11,6 +11,9 @@
     "release": "node scripts/release-version.mjs patch",
     "release:minor": "node scripts/release-version.mjs minor",
     "release:major": "node scripts/release-version.mjs major",
+    "release:publish": "node scripts/release-version.mjs patch --publish",
+    "release:publish:minor": "node scripts/release-version.mjs minor --publish",
+    "release:publish:major": "node scripts/release-version.mjs major --publish",
     "setup": "node scripts/run-bash.mjs scripts/setup.sh",
     "test": "node --import tsx src/streaming/imageTransform.test.ts && node --import tsx src/streaming/resolveOnvifTarget.test.ts && node --import tsx src/streaming/MotionDetectionService.test.ts && node --import tsx src/utils/streamSourceUrl.test.ts && node --import tsx src/utils/redactRtspUrl.test.ts && node --import tsx src/utils/compareVersions.test.ts && node --import tsx src/onvif/parseOnvifMotionEvent.test.ts && node --import tsx src/motion/parseMotionForm.test.ts && node --import tsx src/motion/suggestMotionProvider.test.ts && node --import tsx src/motion/resolveMotionProvider.test.ts && node --import tsx src/motion/providers/reolink/reolinkClient.test.ts && node --import tsx src/motion/providers/unifi/protectHub.test.ts && node --import tsx src/matter/personSensorConfig.test.ts && node --import tsx src/matter/reolinkLightConfig.test.ts && node --import tsx src/matter/reolinkLightLevels.test.ts && node --import tsx src/matter/ptzCoordinates.test.ts && node --import tsx src/cameraProviders/buildProtectRtsp.test.ts && node --import tsx src/cameraProviders/reolinkProvider.test.ts && node --import tsx src/storage/db.test.ts"
   },

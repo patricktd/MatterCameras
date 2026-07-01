@@ -29,4 +29,9 @@ EXPOSE 1984 8554 8555 8555/udp
 ENTRYPOINT ["/sbin/tini", "--"]
 WORKDIR /config
 
+# Baked default config so the pre-built image runs standalone: go2rtc substitutes
+# ${LAN_IP} from the container env at startup. The from-source stack bind-mounts
+# data/go2rtc.yaml over this, so this default only applies to the GHCR path.
+COPY go2rtc.yaml /config/go2rtc.yaml
+
 CMD ["go2rtc", "-config", "/config/go2rtc.yaml"]

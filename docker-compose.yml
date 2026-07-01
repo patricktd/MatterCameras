@@ -57,6 +57,8 @@ services:
       - MATTER_PORT=${MATTER_PORT:-5550}
       - WEB_PORT=${WEB_PORT:-3202}
       - GO2RTC_URL=${GO2RTC_URL:-http://127.0.0.1:3203}
+      # Repo polled for update notifications (override to a fork via .env).
+      - GITHUB_REPO=${GITHUB_REPO:-patricktd/MatterCameras}
       - MATTER_CAMERAS_SELF_UPDATE_ROOT=/project
     depends_on:
       go2rtc:

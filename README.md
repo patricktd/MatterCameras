@@ -26,11 +26,17 @@ RTSP/ONVIF → go2rtc (WebRTC) → Matter-compatible bridge (matter.js 0.17) →
 
 **Host OS:** **Linux or macOS** on the same LAN as your Matter hub and cameras. (Windows is not supported as the bridge host — see [docs/INSTALL.md](docs/INSTALL.md).)
 
-**Requirements:** Docker + Compose v2, **Node.js 22+** (the setup script compiles `dist/` on the host before Docker starts), a Matter hub with **Matter 1.5 camera** support, and at least one RTSP or ONVIF camera.
-
-> **First run needs internet** on the host to pull base images and build the Docker stack (`docker compose up --build`). After that, the bridge runs on your LAN; updates may need registry access again if you rebuild images.
+> **First run needs internet** to pull images. After that, the bridge runs on your LAN.
 
 > **Security:** the Web UI has **no login**. Run it only on a **trusted home LAN**. Do not expose port 3202 to the internet without a separate access layer.
+
+There are two ways to install — pick one:
+
+### Option A — Build from source (default, one-click in-app updates)
+
+The original flow: clone the repo and let the setup script build and run everything. Enables the in-app **Update now** button (git checkout + rebuild).
+
+**Requirements:** Docker + Compose v2, **Node.js 22+** (the setup script compiles `dist/` on the host before Docker starts), a Matter hub with **Matter 1.5 camera** support, and at least one RTSP/ONVIF camera.
 
 ```bash
 git clone https://github.com/patricktd/MatterCameras.git
@@ -40,7 +46,26 @@ bash scripts/setup.sh
 
 The script detects your LAN IP, creates `data/config.json` / `data/go2rtc.yaml` / `.env`, runs `npm ci && npm run build`, and starts **go2rtc** + **app** in Docker.
 
-Then open `http://<your-lan-ip>:3202`, pair the Matter QR in your hub app, and add a camera.
+### Option B — Pre-built image (Portainer / CasaOS / docker)
+
+Run published images from the GitHub Container Registry. **No clone, no Node.js, no build.** Two files, pick the one for your setup:
+
+**CasaOS / Portainer** — import **[docker-compose.casaos.yml](docker-compose.casaos.yml)**, then edit `LAN_IP` (go2rtc) and `MATTER_HOST` (app) to this machine's LAN IPv4 in the app's settings. Every value is concrete (these UIs do not read a `.env`), and it carries an `x-casaos` block (title, icon, Web UI port).
+
+**Plain docker (CLI)** — use **[docker-compose.cli.yml](docker-compose.cli.yml)** with a `.env`:
+
+```bash
+cp .env.cli.example .env      # set LAN_IP in .env
+docker compose -f docker-compose.cli.yml up -d
+```
+
+The app keeps its data in a Docker **named volume** and the go2rtc config ships **inside the image**, so nothing is seeded on the host. **Update later:** `docker compose -f <file> pull && up -d`.
+
+> Requires **Linux with host networking** (Matter mDNS). To run your own fork's images, set `IMAGE_OWNER` in `.env` (CLI) or edit the two `image:` lines (CasaOS).
+
+---
+
+Either way, then open `http://<your-lan-ip>:3202`, pair the Matter QR in your hub app, and add a camera.
 
 **Full walkthrough:** [docs/INSTALL.md](docs/INSTALL.md) (pairing, camera providers, ports, troubleshooting, updates).
 
