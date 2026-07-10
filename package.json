@@ -31,15 +31,21 @@
     "@matter/nodejs": "^0.17.3",
     "@matter/types": "^0.17.3",
     "@project-chip/matter.js": "^0.17.3",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
+    "express-session": "^1.19.0",
     "lowdb": "^7.0.1",
     "onvif": "^0.8.1",
     "unifi-protect": "^4.29.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/ejs": "^3.1.5",
     "@types/express": "^5.0.0",
+    "@types/express-session": "^1.19.0",
     "@types/node": "^22.10.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
