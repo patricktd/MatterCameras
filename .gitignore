@@ -5,6 +5,10 @@ data/cameras.json
 data/config.json
 data/go2rtc.yaml
 data/settings.json
+data/auth.db
+data/auth.db-journal
+data/auth.db-wal
+data/auth.db-shm
 .vscode/
 .env
 deploy.env

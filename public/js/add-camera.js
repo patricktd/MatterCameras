@@ -316,9 +316,20 @@ function initAddCameraPage() {
         });
     });
 
-    form.addEventListener('submit', () => {
+    let isSubmitting = false;
+    form.addEventListener('submit', (e) => {
+        if (isSubmitting) {
+            e.preventDefault();
+            return;
+        }
+        isSubmitting = true;
         if (addSourceInput) {
             addSourceInput.value = providerId;
+        }
+        const submitBtn = form.querySelector('[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding…';
         }
     });
 

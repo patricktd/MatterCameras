@@ -1,5 +1,7 @@
 import express from 'express';
 import { join } from 'path';
+import { randomUUID } from 'node:crypto';
+import session from 'express-session';
 import { PROJECT_ROOT } from '../config/paths.js';
 import { storage } from '../storage/db.js';
 import { settings } from '../storage/settings.js';
@@ -31,6 +33,16 @@ import { setBridgeEndpointCount } from '../config/version.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from '../matter/personSensorConfig.js';
 import { getLatestReleaseInfo } from './githubRelease.js';
 import { getSelfUpdateStatus, isUpdateInProgress, spawnSelfUpdate } from './selfUpdate.js';
+import { initAuthDb, verifyUser, changePassword } from '../auth/authDb.js';
+import { requireAuth, requirePasswordChange } from '../auth/authMiddleware.js';
+
+declare module 'express-session' {
+    interface SessionData {
+        userId: number;
+        username: string;
+        mustChangePassword: boolean;
+    }
+}
 
 const app = express();
 const port = appConfig.webPort;
@@ -38,12 +50,90 @@ const providerMetas = listCameraProviders();
 
 app.set('view engine', 'ejs');
 app.set('views', join(PROJECT_ROOT, 'views'));
-app.get('/api/logs', (req, res) => {
-    res.json(Logger.getLogs().reverse()); // Newest first
-});
 app.use(express.static(join(PROJECT_ROOT, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'matter-cameras-secret-change-me',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+}));
+
+// Login routes (no auth required)
+app.get('/login', (req, res) => {
+    if (req.session.userId) {
+        res.redirect('/');
+        return;
+    }
+    res.render('login', { error: null });
+});
+
+app.post('/login', async (req, res) => {
+    const username = String(req.body?.username ?? '').trim();
+    const password = String(req.body?.password ?? '');
+
+    try {
+        const user = await verifyUser(username, password);
+        if (!user) {
+            res.render('login', { error: 'Invalid username or password.' });
+            return;
+        }
+
+        req.session.userId = user.id;
+        req.session.username = user.username;
+        req.session.mustChangePassword = user.mustChangePassword;
+
+        if (user.mustChangePassword) {
+            res.redirect('/change-password');
+        } else {
+            res.redirect('/');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        res.render('login', { error: 'An error occurred. Please try again.' });
+    }
+});
+
+app.get('/change-password', requireAuth, (req, res) => {
+    res.render('change-password', { error: null });
+});
+
+app.post('/change-password', requireAuth, async (req, res) => {
+    const newPassword = String(req.body?.newPassword ?? '');
+    const confirmPassword = String(req.body?.confirmPassword ?? '');
+
+    if (!newPassword || newPassword.length < 4) {
+        res.render('change-password', { error: 'Password must be at least 4 characters.' });
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        res.render('change-password', { error: 'Passwords do not match.' });
+        return;
+    }
+
+    try {
+        await changePassword(req.session.userId!, newPassword);
+        req.session.mustChangePassword = false;
+        res.redirect('/');
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.render('change-password', { error: 'An error occurred. Please try again.' });
+    }
+});
+
+app.post('/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.redirect('/login');
+    });
+});
+
+// Protected logs route
+app.get('/api/logs', requireAuth, (req, res) => {
+    res.json(Logger.getLogs().reverse()); // Newest first
+});
 
 function getBridgeStatus() {
     return bridge.isCommissioned() ? 'Commissioned' : 'Ready to Pair';
@@ -75,8 +165,8 @@ function resolveReturnToPath(raw: unknown): string {
     return '/';
 }
 
-// Routes
-app.get('/', async (req, res) => {
+// Routes (auth required)
+app.get('/', requireAuth, requirePasswordChange, async (req, res) => {
     scheduleReolinkLightCapabilityProbes(storage.getCameras());
     schedulePtzCapabilityProbes(storage.getCameras());
 
@@ -90,19 +180,19 @@ app.get('/', async (req, res) => {
     });
 });
 
-app.get('/options', (_req, res) => {
+app.get('/options', requireAuth, requirePasswordChange, (_req, res) => {
     res.render('options', commonViewData());
 });
 
-app.get('/cameras/add', (_req, res) => {
+app.get('/cameras/add', requireAuth, requirePasswordChange, (_req, res) => {
     res.render('add-camera', {
         ...commonViewData(),
         providers: providerMetas,
     });
 });
 
-app.get('/cameras/add/:providerId', (req, res) => {
-    const provider = getCameraProvider(req.params.providerId);
+app.get('/cameras/add/:providerId', requireAuth, requirePasswordChange, (req, res) => {
+    const provider = getCameraProvider(req.params.providerId as string);
     if (!provider) {
         res.redirect('/cameras/add');
         return;
@@ -115,16 +205,16 @@ app.get('/cameras/add/:providerId', (req, res) => {
     });
 });
 
-app.get('/api/settings', (_req, res) => {
+app.get('/api/settings', requireAuth, (_req, res) => {
     res.json(settings.getSettings());
 });
 
 /** Saved vendor controller logins (passwords never returned). */
-app.get('/api/settings/controllers', (_req, res) => {
+app.get('/api/settings/controllers', requireAuth, (_req, res) => {
     res.json({ protect: settings.getProtectControllerPublic() ?? null });
 });
 
-app.put('/api/settings/protect-controller', async (req, res) => {
+app.put('/api/settings/protect-controller', requireAuth, async (req, res) => {
     const host = String(req.body?.host ?? '').trim();
     const username = String(req.body?.username ?? '').trim();
     const password = String(req.body?.password ?? '');
@@ -142,18 +232,18 @@ app.put('/api/settings/protect-controller', async (req, res) => {
     }
 });
 
-app.delete('/api/settings/protect-controller', async (_req, res) => {
+app.delete('/api/settings/protect-controller', requireAuth, async (_req, res) => {
     await settings.clearProtectController();
     res.json({ ok: true });
 });
 
 /** Running version — compare after rebuilding dist/ and restarting the app container. */
-app.get('/api/version', (_req, res) => {
+app.get('/api/version', requireAuth, (_req, res) => {
     res.json({ version: appVersion });
 });
 
 /** Compare running version with the latest GitHub release. */
-app.get('/api/updates', async (_req, res) => {
+app.get('/api/updates', requireAuth, async (_req, res) => {
     try {
         const release = await getLatestReleaseInfo(appVersion);
         const { canAutoUpdate } = getSelfUpdateStatus();
@@ -168,7 +258,7 @@ app.get('/api/updates', async (_req, res) => {
 });
 
 /** One-click self-update from the Web UI (Docker + git checkout). */
-app.post('/api/updates/apply', async (req, res) => {
+app.post('/api/updates/apply', requireAuth, async (req, res) => {
     if (isUpdateInProgress()) {
         res.status(409).json({ error: 'Update already in progress.' });
         return;
@@ -206,7 +296,7 @@ app.post('/api/updates/apply', async (req, res) => {
     }
 });
 
-app.get('/api/pairing', async (_req, res) => {
+app.get('/api/pairing', requireAuth, async (_req, res) => {
     const pairingInfo = await bridge.getPairingInfo();
     res.json({
         ...pairingInfo,
@@ -214,7 +304,7 @@ app.get('/api/pairing', async (_req, res) => {
     });
 });
 
-app.post('/api/pairing/refresh', async (_req, res) => {
+app.post('/api/pairing/refresh', requireAuth, async (_req, res) => {
     if (bridge.isCommissioned()) {
         res.status(409).json({
             error: 'Bridge is already paired',
@@ -287,7 +377,7 @@ app.post('/api/pairing/close-window', async (_req, res) => {
 });
 
 /** Dashboard preview — JPEG snapshot from go2rtc (same path as SmartThings CaptureSnapshot). */
-app.get('/api/cameras/:id/snapshot', async (req, res) => {
+app.get('/api/cameras/:id/snapshot', requireAuth, async (req, res) => {
     const camera = storage.getCameras().find(c => c.id === req.params.id);
     if (!camera) {
         res.status(404).json({ error: 'Camera not found' });
@@ -307,7 +397,7 @@ app.get('/api/cameras/:id/snapshot', async (req, res) => {
 });
 
 /** Manual PTZ test — same directions as SmartThings d-pad (Reolink native API or ONVIF). */
-app.post('/api/cameras/:id/ptz/:direction', async (req, res) => {
+app.post('/api/cameras/:id/ptz/:direction', requireAuth, async (req, res) => {
     const camera = storage.getCameras().find(c => c.id === req.params.id);
     if (!camera) {
         res.status(404).json({ error: 'Camera not found' });
@@ -331,7 +421,7 @@ app.post('/api/cameras/:id/ptz/:direction', async (req, res) => {
 });
 
 /** Probe PTZ capability without moving the camera. */
-app.get('/api/cameras/:id/ptz/probe', async (req, res) => {
+app.get('/api/cameras/:id/ptz/probe', requireAuth, async (req, res) => {
     const camera = storage.getCameras().find(c => c.id === req.params.id);
     if (!camera) {
         res.status(404).json({ error: 'Camera not found' });
@@ -347,7 +437,7 @@ app.get('/api/cameras/:id/ptz/probe', async (req, res) => {
 });
 
 /** Test go2rtc snapshot for every camera in cameras.json (hub-independent). */
-app.get('/api/diagnostics/snapshots', async (_req, res) => {
+app.get('/api/diagnostics/snapshots', requireAuth, async (_req, res) => {
     const cameras = storage.getCameras();
     const results = await Promise.all(cameras.map(async cam => {
         const started = Date.now();
@@ -373,7 +463,7 @@ app.get('/api/diagnostics/snapshots', async (_req, res) => {
     res.json({ cameras: results, orphanMatterEndpoints: bridge.listOrphanBridgedCameraIds(expectedBridgedEndpointIds(cameras)) });
 });
 
-app.get('/api/diagnostics/bridge', (_req, res) => {
+app.get('/api/diagnostics/bridge', requireAuth, (_req, res) => {
     const cameras = storage.getCameras();
     const expected = expectedBridgedEndpointIds(cameras);
     const endpoints = bridge.listBridgedMatterEndpoints();
@@ -386,12 +476,12 @@ app.get('/api/diagnostics/bridge', (_req, res) => {
 });
 
 /** Camera add plugins (UniFi Protect, Reolink, ONVIF, manual). */
-app.get('/api/camera-providers', (_req, res) => {
+app.get('/api/camera-providers', requireAuth, (_req, res) => {
     res.json({ providers: listCameraProviders() });
 });
 
-app.post('/api/camera-providers/:providerId/discover', async (req, res) => {
-    const provider = getCameraProvider(req.params.providerId);
+app.post('/api/camera-providers/:providerId/discover', requireAuth, async (req, res) => {
+    const provider = getCameraProvider(req.params.providerId as string);
     if (!provider) {
         res.status(404).json({ error: 'Unknown camera provider' });
         return;
@@ -410,8 +500,8 @@ app.post('/api/camera-providers/:providerId/discover', async (req, res) => {
     }
 });
 
-app.post('/api/camera-providers/:providerId/resolve', async (req, res) => {
-    const provider = getCameraProvider(req.params.providerId);
+app.post('/api/camera-providers/:providerId/resolve', requireAuth, async (req, res) => {
+    const provider = getCameraProvider(req.params.providerId as string);
     if (!provider) {
         res.status(404).json({ error: 'Unknown camera provider' });
         return;
@@ -426,7 +516,7 @@ app.post('/api/camera-providers/:providerId/resolve', async (req, res) => {
 });
 
 /** WS-Discovery scan for ONVIF cameras on the LAN (UDP 3702 multicast). */
-app.post('/api/onvif/discover', async (req, res) => {
+app.post('/api/onvif/discover', requireAuth, async (req, res) => {
     const raw = Number(req.body?.timeoutMs);
     const timeoutMs = Number.isFinite(raw) ? Math.min(15_000, Math.max(2_000, raw)) : 5_000;
     try {
@@ -446,7 +536,7 @@ app.post('/api/onvif/discover', async (req, res) => {
 });
 
 /** Connect to a discovered ONVIF device and fetch RTSP stream URI + device info. */
-app.post('/api/onvif/resolve', async (req, res) => {
+app.post('/api/onvif/resolve', requireAuth, async (req, res) => {
     const hostname = String(req.body?.hostname ?? '').trim();
     const port = Number(req.body?.port) || 80;
     const path = String(req.body?.path ?? '/onvif/device_service').trim();
@@ -472,7 +562,7 @@ app.post('/api/onvif/resolve', async (req, res) => {
 });
 
 /** Import one or all new UniFi Protect cameras into the bridge roster. */
-app.post('/api/camera-providers/unifi-protect/import', async (req, res) => {
+app.post('/api/camera-providers/unifi-protect/import', requireAuth, async (req, res) => {
     try {
         const creds = resolveProtectCredentials(req.body ?? {});
         if (req.body?.saveController) {
@@ -536,7 +626,7 @@ app.post('/api/camera-providers/unifi-protect/import', async (req, res) => {
 });
 
 /** Link existing roster cameras to Protect (by name or RTSP alias). */
-app.post('/api/camera-providers/unifi-protect/sync-existing', async (req, res) => {
+app.post('/api/camera-providers/unifi-protect/sync-existing', requireAuth, async (req, res) => {
     try {
         const creds = resolveProtectCredentials(req.body ?? {});
         if (req.body?.saveController) {
@@ -599,7 +689,7 @@ app.post('/api/camera-providers/unifi-protect/sync-existing', async (req, res) =
     }
 });
 
-app.post('/api/restart', (req, res) => {
+app.post('/api/restart', requireAuth, (req, res) => {
     const returnTo = resolveReturnToPath(req.body.returnTo);
     res.status(202).type('html').send(bridgeRestartingPageHtml(returnTo));
     setImmediate(() => {
@@ -607,11 +697,11 @@ app.post('/api/restart', (req, res) => {
     });
 });
 
-app.post('/api/cameras', async (req, res) => {
+app.post('/api/cameras', requireAuth, async (req, res) => {
     try {
         const motionFields = sanitizeCameraMotionFields(req.body as Record<string, unknown>);
         const config: Camera = {
-            id: 'cam-' + Date.now(),
+            id: 'cam-' + randomUUID(),
             name: req.body.name,
             rtspUrl: req.body.rtspUrl,
             codec: req.body.codec,
@@ -627,9 +717,9 @@ app.post('/api/cameras', async (req, res) => {
     }
 });
 
-app.post('/api/cameras/:id', async (req, res) => {
+app.post('/api/cameras/:id', requireAuth, async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id as string;
         const existing = storage.getCamera(id);
         if (!existing) {
             res.status(404).send('Camera not found');
@@ -662,8 +752,8 @@ app.post('/api/cameras/:id', async (req, res) => {
     }
 });
 
-app.post('/api/cameras/:id/recycle-matter', async (req, res) => {
-    const { id } = req.params;
+app.post('/api/cameras/:id/recycle-matter', requireAuth, async (req, res) => {
+    const id = req.params.id as string;
     const existing = storage.getCamera(id);
     if (!existing) {
         res.status(404).send('Camera not found');
@@ -679,8 +769,8 @@ app.post('/api/cameras/:id/recycle-matter', async (req, res) => {
     }
 });
 
-app.post('/api/cameras/:id/duplicate', async (req, res) => {
-    const { id } = req.params;
+app.post('/api/cameras/:id/duplicate', requireAuth, async (req, res) => {
+    const id = req.params.id as string;
     const existing = storage.getCamera(id);
     if (!existing) {
         res.status(404).send('Camera not found');
@@ -694,7 +784,7 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
     }
 
     const config: Camera = {
-        id: 'cam-' + Date.now(),
+        id: 'cam-' + randomUUID(),
         name,
         rtspUrl: existing.rtspUrl,
         codec: existing.codec,
@@ -726,8 +816,8 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
     res.redirect('/');
 });
 
-app.post('/api/cameras/:id/delete', async (req, res) => {
-    const { id } = req.params;
+app.post('/api/cameras/:id/delete', requireAuth, async (req, res) => {
+    const id = req.params.id as string;
     await storage.removeCamera(id);
     setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.removeCamera(id);
@@ -737,7 +827,7 @@ app.post('/api/cameras/:id/delete', async (req, res) => {
     res.redirect('/');
 });
 
-app.post('/api/reset', (_req, res) => {
+app.post('/api/reset', requireAuth, (_req, res) => {
     res.status(202).type('html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>

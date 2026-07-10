@@ -25,7 +25,7 @@
         <div>
             <div class="dashboard-stack">
                 <section class="card dashboard-toolbar" aria-label="Dashboard summary">
-                    <a href="/cameras/add" class="btn">Add Camera</a>
+                    <a href="/cameras/add" class="btn"><span class="material-symbols-outlined">videocam</span> Add Camera</a>
                     <div class="dashboard-toolbar__stats">
                         <div class="dashboard-toolbar__stat">
                             <span class="dashboard-toolbar__value"><%= cameras.length %></span>
@@ -47,10 +47,10 @@
                             <div class="camera-view-header">
                                 <h3><%= cam.name %></h3>
                                 <div class="camera-actions">
-                                    <button type="button" class="btn btn-secondary btn-sm btn-edit">Edit</button>
+                                    <button type="button" class="btn btn-secondary btn-sm btn-edit"><span class="material-symbols-outlined">edit</span> Edit</button>
                                     <form action="/api/cameras/<%= cam.id %>/delete" method="POST" style="display:inline;"
                                         onsubmit="return confirm('Remove camera <%= cam.name %>?');">
-                                        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                        <button type="submit" class="btn btn-danger btn-sm"><span class="material-symbols-outlined">delete</span> Remove</button>
                                     </form>
                                 </div>
                             </div>
@@ -130,16 +130,16 @@
                             </details>
 
                             <div class="camera-actions">
-                                <button type="submit" class="btn btn-sm">Save</button>
+                                <button type="submit" class="btn btn-sm"><span class="material-symbols-outlined">save</span> Save</button>
                                 <button type="button" class="btn btn-secondary btn-sm btn-duplicate"
-                                    data-source-name="<%= cam.name %>">Duplicate</button>
+                                    data-source-name="<%= cam.name %>"><span class="material-symbols-outlined">content_copy</span> Duplicate</button>
                                 <% if (isCommissioned) { %>
                                 <form action="/api/cameras/<%= cam.id %>/recycle-matter" method="POST" style="display:inline;"
                                     onsubmit="return confirm('Reset hub binding for <%= cam.name %>? Remove this camera (and any person/light child) from your hub app first, then confirm.');">
-                                    <button type="submit" class="btn btn-secondary btn-sm">Reset Binding</button>
+                                    <button type="submit" class="btn btn-secondary btn-sm"><span class="material-symbols-outlined">refresh</span> Reset Binding</button>
                                 </form>
                                 <% } %>
-                                <button type="button" class="btn btn-secondary btn-sm btn-cancel">Cancel</button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-cancel"><span class="material-symbols-outlined">close</span> Cancel</button>
                             </div>
                         </form>
                         </div>
@@ -210,7 +210,7 @@
 
                 <div class="pairing-actions">
                     <% if (!isCommissioned) { %>
-                        <button type="button" id="refresh-pairing-btn" class="btn btn-ghost">New pairing code</button>
+                        <button type="button" id="refresh-pairing-btn" class="btn btn-ghost"><span class="material-symbols-outlined">qr_code</span> New pairing code</button>
                         <button type="button" id="reload-pairing-btn" class="btn btn-ghost btn-sm">Reload</button>
                     <% } %>
                 </div>

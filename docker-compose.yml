@@ -53,7 +53,9 @@ services:
       - TZ=${TZ:-America/Sao_Paulo}
       - MATTER_STORAGE_PATH=/app/data/matter-storage
       - MATTER_HOST=${MATTER_HOST:-127.0.0.1}
-      - MATTER_BIND_HOST=${MATTER_BIND_HOST:-${MATTER_HOST:-127.0.0.1}}
+      # Bind to all interfaces by default. Containers (WSL2 / Docker Desktop) do not
+      # necessarily have MATTER_HOST assigned as a local address → EADDRNOTAVAIL.
+      - MATTER_BIND_HOST=${MATTER_BIND_HOST:-0.0.0.0}
       - MATTER_PORT=${MATTER_PORT:-5550}
       - WEB_PORT=${WEB_PORT:-3202}
       - GO2RTC_URL=${GO2RTC_URL:-http://127.0.0.1:3203}
