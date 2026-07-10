@@ -40,8 +40,20 @@ import { OccupancySensingServer } from '@matter/node/behaviors/occupancy-sensing
 import { OnOffServer } from '@matter/node/behaviors/on-off';
 import { LevelControlServer } from '@matter/node/behaviors/level-control';
 import { CommissioningServer } from '@matter/node/behaviors/system/commissioning';
-import { randomInt } from 'node:crypto';
-import type { PairingInfo } from '../types/index.js';
+import { AdministratorCommissioningServer } from '@matter/node/behaviors/administrator-commissioning';
+import { AdministratorCommissioning } from '@matter/types/clusters/administrator-commissioning';
+import { DeviceCommissioner, FabricManager, PaseServer, SessionManager } from '@matter/main/protocol';
+import {
+    CommissioningFlowType,
+    DiscoveryCapabilitiesSchema,
+    FabricIndex,
+    isValidPasscode,
+    ManualPairingCodeCodec,
+    QrPairingCodeCodec,
+} from '@matter/types';
+import { randomBytes, randomInt } from 'node:crypto';
+import type { CommissioningWindowInfo, FabricInfo, PairingInfo } from '../types/index.js';
+import { matterVendorName } from './fabricVendors.js';
 
 /** Matter Aggregator (bridge) device type — must match mDNS commissioning advert. */
 const BRIDGE_DEVICE_TYPE = DeviceTypeId(0x0e);
@@ -51,11 +63,16 @@ function isLegacySlotEndpointId(id: string): boolean {
     return /^cam-slot-\d{2}$/.test(id);
 }
 
+/** How long an ad-hoc "pair another hub" commissioning window stays open (Matter standard). */
+const ADDITIONAL_PAIRING_WINDOW_MS = 15 * 60 * 1000;
+
 export class MatterBridge {
     private server?: ServerNode;
     private aggregator?: Endpoint;
     private readonly cameraEndpoints = new Map<string, Endpoint>();
     private started = false;
+    #adHocWindow?: { pairing: PairingInfo; expiresAt: number; timer: NodeJS.Timeout };
+    #lastIntentionalFabricRemovalAt = 0;
     readonly go2rtc: Go2RTCClient;
     readonly motionDetection = new MotionDetectionService();
     readonly reolinkLight = new ReolinkLightService();
@@ -345,6 +362,194 @@ export class MatterBridge {
 
     isCommissioned() {
         return this.server?.state.commissioning.commissioned ?? false;
+    }
+
+    /** All fabrics (admin ecosystems) this bridge is commissioned into. */
+    listFabrics(): FabricInfo[] {
+        if (!this.server) return [];
+        try {
+            return this.server.env.get(FabricManager).fabrics.map(fabric => ({
+                fabricIndex: Number(fabric.fabricIndex),
+                fabricId: fabric.fabricId.toString(),
+                nodeId: fabric.nodeId.toString(),
+                rootVendorId: Number(fabric.rootVendorId),
+                vendorName: matterVendorName(Number(fabric.rootVendorId)),
+                label: fabric.label,
+            }));
+        } catch (error) {
+            console.warn(`Failed to list Matter fabrics: ${error}`);
+            return [];
+        }
+    }
+
+    supportedFabricCount(): number {
+        try {
+            return this.server?.state.operationalCredentials.supportedFabrics ?? 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
+     * Gracefully remove one fabric (hub association). Sessions and subscriptions of
+     * that hub are closed; other fabrics keep working. Removing the last fabric
+     * returns the bridge to pairing mode.
+     */
+    async removeFabric(fabricIndex: number): Promise<boolean> {
+        if (!this.server) return false;
+
+        const fabric = this.server.env.get(FabricManager).maybeFor(FabricIndex(fabricIndex));
+        if (!fabric) return false;
+
+        console.log(
+            `Removing Matter fabric index=${fabricIndex} label="${fabric.label}" `
+            + `rootVendorId=0x${Number(fabric.rootVendorId).toString(16)}`,
+        );
+        this.#lastIntentionalFabricRemovalAt = Date.now();
+        await fabric.leave();
+        console.log(`Matter fabric ${fabricIndex} removed; ${this.listFabrics().length} fabric(s) remaining`);
+        return true;
+    }
+
+    /**
+     * True shortly after an operator-initiated fabric removal — used to keep the
+     * stale-fabric crash recovery from wiping storage (and every other hub's
+     * pairing) over transient fabric-not-found errors from the removed hub.
+     */
+    recentIntentionalFabricRemoval(withinMs = 120_000): boolean {
+        return this.#lastIntentionalFabricRemovalAt > 0
+            && Date.now() - this.#lastIntentionalFabricRemovalAt < withinMs;
+    }
+
+    /**
+     * Open an Enhanced Commissioning window so an additional hub (fabric) can pair
+     * while the bridge stays commissioned to the existing hubs. Returns one-time
+     * pairing codes valid for 15 minutes.
+     */
+    async openCommissioningWindow(): Promise<CommissioningWindowInfo> {
+        if (!this.server) {
+            return { qrCode: '', manualPairingCode: '', windowOpen: false };
+        }
+
+        // Before first pairing the basic window is already open — reuse its codes.
+        if (!this.isCommissioned()) {
+            const pairing = await this.getPairingInfo();
+            return { ...pairing, windowOpen: true };
+        }
+
+        if (this.#adHocWindow) {
+            return this.getCommissioningWindowInfo();
+        }
+
+        // A hub may have opened a window itself (hub-initiated multi-admin) — don't clobber it.
+        const currentStatus = this.server.state.administratorCommissioning.windowStatus;
+        if (currentStatus !== AdministratorCommissioning.CommissioningWindowStatus.WindowNotOpen) {
+            throw new Error(
+                'A commissioning window is already open (opened from a hub app). '
+                + 'Close it there or wait for it to expire.',
+            );
+        }
+
+        const passcode = this.#generatePasscode();
+        const discriminator = randomInt(0, 4096);
+        const env = this.server.env;
+        const paseServer = await PaseServer.fromPin(env.get(SessionManager), passcode, {
+            iterations: 1000,
+            salt: randomBytes(32),
+        });
+
+        await env.get(DeviceCommissioner).allowEnhancedCommissioning(
+            discriminator,
+            paseServer,
+            () => this.#onCommissioningWindowClosed(),
+        );
+
+        const qrCode = QrPairingCodeCodec.encode([{
+            version: 0,
+            vendorId: VendorId(appConfig.vendor.vendorId),
+            productId: appConfig.vendor.productId,
+            flowType: CommissioningFlowType.Standard,
+            discriminator,
+            passcode,
+            discoveryCapabilities: DiscoveryCapabilitiesSchema.encode({
+                ble: false,
+                onIpNetwork: true,
+                wifiPublicActionFrame: false,
+            }),
+        }]);
+        const manualPairingCode = ManualPairingCodeCodec.encode({ discriminator, passcode });
+
+        const expiresAt = Date.now() + ADDITIONAL_PAIRING_WINDOW_MS;
+        const timer = setTimeout(() => {
+            void this.closeCommissioningWindow().catch(error =>
+                console.warn(`Failed to close expired commissioning window: ${error}`));
+        }, ADDITIONAL_PAIRING_WINDOW_MS);
+        timer.unref();
+        this.#adHocWindow = { pairing: { qrCode, manualPairingCode }, expiresAt, timer };
+
+        await this.#setAdminCommissioningWindowStatus(
+            AdministratorCommissioning.CommissioningWindowStatus.EnhancedWindowOpen,
+        );
+
+        console.log(
+            `Opened additional-fabric commissioning window discriminator=${discriminator} `
+            + `(expires in ${ADDITIONAL_PAIRING_WINDOW_MS / 60000} min)`,
+        );
+        return this.getCommissioningWindowInfo();
+    }
+
+    /** Close a previously opened additional-fabric commissioning window. */
+    async closeCommissioningWindow(): Promise<void> {
+        if (!this.server || !this.#adHocWindow) return;
+        try {
+            await this.server.env.get(DeviceCommissioner).endCommissioning();
+        } catch (error) {
+            console.warn(`Failed to end commissioning window: ${error}`);
+            this.#onCommissioningWindowClosed();
+        }
+    }
+
+    getCommissioningWindowInfo(): CommissioningWindowInfo {
+        if (!this.#adHocWindow) {
+            return { qrCode: '', manualPairingCode: '', windowOpen: false };
+        }
+        return {
+            ...this.#adHocWindow.pairing,
+            windowOpen: true,
+            expiresAt: new Date(this.#adHocWindow.expiresAt).toISOString(),
+        };
+    }
+
+    #onCommissioningWindowClosed(): void {
+        if (this.#adHocWindow) {
+            clearTimeout(this.#adHocWindow.timer);
+            this.#adHocWindow = undefined;
+            console.log('Additional-fabric commissioning window closed');
+        }
+        void this.#setAdminCommissioningWindowStatus(
+            AdministratorCommissioning.CommissioningWindowStatus.WindowNotOpen,
+        );
+    }
+
+    /** Mirror window state onto the AdministratorCommissioning cluster for subscribed hubs. */
+    async #setAdminCommissioningWindowStatus(
+        windowStatus: AdministratorCommissioning.CommissioningWindowStatus,
+    ): Promise<void> {
+        if (!this.server) return;
+        try {
+            await this.server.setStateOf(AdministratorCommissioningServer, { windowStatus });
+        } catch (error) {
+            console.warn(`Failed to update AdministratorCommissioning windowStatus: ${error}`);
+        }
+    }
+
+    #generatePasscode(): number {
+        // Spec range 1..99999998 minus trivial values (11111111, 12345678, …).
+        let passcode = randomInt(1, 99999999);
+        while (!isValidPasscode(passcode)) {
+            passcode = randomInt(1, 99999999);
+        }
+        return passcode;
     }
 
     async updateCamera(camera: Camera) {

@@ -161,6 +161,23 @@
                             you want to reload the bridge (about 15 seconds).
                         </p>
                     </div>
+
+                    <div id="fabrics-section" class="fabrics-section">
+                        <h3>Connected hubs (Matter fabrics)</h3>
+                        <p class="field-hint">
+                            Each fabric is a Matter ecosystem this bridge is paired with
+                            (SmartThings, Apple Home, Google Home, …).
+                        </p>
+                        <ul id="fabric-list" class="fabric-list">
+                            <li class="fabric-empty">Loading fabrics…</li>
+                        </ul>
+                        <div class="pairing-actions">
+                            <button type="button" id="open-window-btn" class="btn btn-ghost">Pair another hub</button>
+                            <button type="button" id="close-window-btn" class="btn btn-ghost btn-sm" hidden>Close pairing window</button>
+                        </div>
+                        <div id="additional-pairing" class="additional-pairing" hidden></div>
+                        <p id="fabric-status" class="field-hint" hidden></p>
+                    </div>
                 <% } else { %>
                     <p class="pairing-hint">
                         Your hub and this server must be on the same local network.

@@ -20,7 +20,9 @@ RTSP/ONVIF → go2rtc (WebRTC) → Matter-compatible bridge (matter.js 0.17) →
 
 - **Bridge** — bridged `Camera` endpoints (type `0x0142`) with AV Stream + WebRTC clusters
 - **go2rtc** — RTSP ingest and WebRTC SDP exchange
-- **Web UI** — add/remove cameras, Matter pairing QR, motion sensitivity
+- **Web UI** — add/remove cameras, Matter pairing QR, motion sensitivity, multi-hub fabric management
+
+Supports **multiple Matter fabrics** (multi-admin): pair the same bridge with SmartThings, Apple Home, Google Home, etc. simultaneously, list connected hubs, and remove individual hub associations from the dashboard — see [docs/MATTER-BRIDGE.md](docs/MATTER-BRIDGE.md).
 
 ## Quick start
 

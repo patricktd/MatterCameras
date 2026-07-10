@@ -88,6 +88,35 @@ Try:
 4. **Remove and re-pair the bridge** (cameras stay in `data/cameras.json`) — required if the hub paired before those cameras existed.
 5. Use **Restart Required** in the Web UI only as a last resort.
 
+## Multiple hubs (Matter multi-fabric / multi-admin)
+
+Matter supports commissioning one device into several **fabrics** — independent admin ecosystems such as SmartThings, Apple Home, and Google Home — at the same time. The bridge supports this:
+
+1. **First hub** pairs with the QR code shown while the bridge is uncommissioned (Basic Commissioning).
+2. **Additional hubs** pair through **Pair another hub** on the dashboard. This opens a 15-minute
+   [Enhanced Commissioning window](https://developers.home.google.com/matter/primer/multi-admin) with a
+   fresh one-time passcode and shows a new QR / manual code (Matter core spec § 11.19, Administrator
+   Commissioning cluster). The window closes automatically after a hub pairs, on timeout, or via
+   **Close pairing window**.
+3. **Connected hubs** are listed on the dashboard with the fabric label set by the controller (falling
+   back to the ecosystem name derived from the CSA vendor ID). Each entry has a **Remove** button that
+   gracefully removes only that fabric — remaining hubs are unaffected. Removing the last fabric returns
+   the bridge to pairing mode.
+
+Hub apps can also open a commissioning window themselves (e.g. Apple Home "Turn On Pairing Mode",
+Google Home "Link Matter apps & services") — that hub-initiated multi-admin flow works independently
+of the dashboard button.
+
+API endpoints: `GET /api/fabrics`, `DELETE /api/fabrics/:fabricIndex`,
+`POST /api/pairing/open-window`, `POST /api/pairing/close-window`.
+
+Notes:
+
+- Every fabric receives the same bridged endpoints; WebRTC live-view sessions are tracked per fabric.
+- matter.js persists all fabrics in `data/matter-storage/` — keep that directory to keep all pairings.
+- When removing a hub, also delete the bridge from that hub's app; the hub is not otherwise notified
+  beyond its sessions being closed.
+
 ## Operational limits
 
 See [SCALING.md](SCALING.md) — many Matter bridges recommend staying under ~50 bridged devices per aggregator for stable operation.
