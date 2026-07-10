@@ -81,3 +81,22 @@ export interface PairingInfo {
     qrCode: string;
     manualPairingCode: string;
 }
+
+/** One Matter fabric (admin ecosystem) the bridge is commissioned into. */
+export interface FabricInfo {
+    fabricIndex: number;
+    fabricId: string;
+    nodeId: string;
+    rootVendorId: number;
+    /** Known ecosystem name derived from rootVendorId (Apple Home, SmartThings, …). */
+    vendorName?: string;
+    /** Label set by the controller via UpdateFabricLabel; may be empty. */
+    label: string;
+}
+
+/** State of an ad-hoc commissioning window opened to pair an additional hub. */
+export interface CommissioningWindowInfo extends PairingInfo {
+    windowOpen: boolean;
+    /** ISO timestamp when the open window expires (absent when closed). */
+    expiresAt?: string;
+}

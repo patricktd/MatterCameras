@@ -232,6 +232,60 @@ app.post('/api/pairing/refresh', async (_req, res) => {
     });
 });
 
+/** Fabrics = hub ecosystems (SmartThings, Apple Home, …) this bridge is paired with. */
+app.get('/api/fabrics', (_req, res) => {
+    res.json({
+        commissioned: bridge.isCommissioned(),
+        fabrics: bridge.listFabrics(),
+        supportedFabrics: bridge.supportedFabricCount(),
+        window: bridge.getCommissioningWindowInfo(),
+    });
+});
+
+/** Remove one hub association; other fabrics keep working. */
+app.delete('/api/fabrics/:fabricIndex', async (req, res) => {
+    const fabricIndex = Number(req.params.fabricIndex);
+    if (!Number.isInteger(fabricIndex) || fabricIndex < 1 || fabricIndex > 254) {
+        res.status(400).json({ error: 'Invalid fabric index' });
+        return;
+    }
+
+    try {
+        const removed = await bridge.removeFabric(fabricIndex);
+        if (!removed) {
+            res.status(404).json({ error: `Fabric ${fabricIndex} not found` });
+            return;
+        }
+        res.json({
+            ok: true,
+            fabricIndex,
+            commissioned: bridge.isCommissioned(),
+            fabrics: bridge.listFabrics(),
+        });
+    } catch (error) {
+        res.status(500).json({ error: String(error) });
+    }
+});
+
+/** Open a 15-minute enhanced commissioning window to pair an additional hub. */
+app.post('/api/pairing/open-window', async (_req, res) => {
+    try {
+        const window = await bridge.openCommissioningWindow();
+        res.json({ ...window, commissioned: bridge.isCommissioned() });
+    } catch (error) {
+        res.status(500).json({ error: String(error) });
+    }
+});
+
+app.post('/api/pairing/close-window', async (_req, res) => {
+    try {
+        await bridge.closeCommissioningWindow();
+        res.json({ ok: true, window: bridge.getCommissioningWindowInfo() });
+    } catch (error) {
+        res.status(500).json({ error: String(error) });
+    }
+});
+
 /** Dashboard preview — JPEG snapshot from go2rtc (same path as SmartThings CaptureSnapshot). */
 app.get('/api/cameras/:id/snapshot', async (req, res) => {
     const camera = storage.getCameras().find(c => c.id === req.params.id);
