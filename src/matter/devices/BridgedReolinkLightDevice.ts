@@ -25,7 +25,7 @@ export function bridgedReolinkLightOptions(camera: Camera) {
             reachable: true,
             vendorName: camera.manufacturer?.trim() || 'Reolink',
             productName: 'Light',
-            serialNumber: id,
+            serialNumber: id.slice(0, 32),
             uniqueId: bridgedUniqueId(id, camera.matterBindEpoch),
             hardwareVersion: 1,
             hardwareVersionString: '1.0',
