@@ -647,7 +647,7 @@ app.post('/api/cameras', requireAuth, async (req, res) => {
     try {
         const motionFields = sanitizeCameraMotionFields(req.body as Record<string, unknown>);
         const config: Camera = {
-            id: 'cam-' + randomUUID(),
+            id: 'cam-' + randomUUID().replace(/-/g, '').slice(0, 12),
             name: req.body.name,
             rtspUrl: req.body.rtspUrl,
             codec: req.body.codec,
@@ -730,7 +730,7 @@ app.post('/api/cameras/:id/duplicate', requireAuth, async (req, res) => {
     }
 
     const config: Camera = {
-        id: 'cam-' + randomUUID(),
+        id: 'cam-' + randomUUID().replace(/-/g, '').slice(0, 12),
         name,
         rtspUrl: existing.rtspUrl,
         codec: existing.codec,
