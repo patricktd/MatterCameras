@@ -278,10 +278,180 @@ function initPairingPanel() {
     }
 }
 
+function initFabricsPanel() {
+    const list = document.getElementById('fabric-list');
+    if (!list) return;
+
+    const openBtn = document.getElementById('open-window-btn');
+    const closeBtn = document.getElementById('close-window-btn');
+    const pairingBox = document.getElementById('additional-pairing');
+    const statusLine = document.getElementById('fabric-status');
+    let knownFabricCount = null;
+    let windowPoll = null;
+
+    const setStatus = (text) => {
+        if (!statusLine) return;
+        statusLine.hidden = !text;
+        statusLine.textContent = text || '';
+    };
+
+    const fabricDisplayName = (fabric) => {
+        if (fabric.label && fabric.label.trim()) return fabric.label.trim();
+        if (fabric.vendorName) return fabric.vendorName;
+        return `Fabric ${fabric.fabricIndex}`;
+    };
+
+    const renderFabrics = (data) => {
+        const fabrics = data.fabrics || [];
+        if (!fabrics.length) {
+            list.innerHTML = '<li class="fabric-empty">No hubs paired. The bridge is in pairing mode — '
+                + 'reload this page to show the pairing QR code.</li>';
+            return;
+        }
+
+        list.innerHTML = fabrics.map(fabric => `
+            <li class="fabric-item" data-fabric-index="${fabric.fabricIndex}">
+                <div class="fabric-info">
+                    <strong>${escapeHtml(fabricDisplayName(fabric))}</strong>
+                    <small>
+                        ${fabric.vendorName && fabric.label ? `${escapeHtml(fabric.vendorName)} · ` : ''}
+                        vendor 0x${Number(fabric.rootVendorId).toString(16)} · index ${fabric.fabricIndex}
+                    </small>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm fabric-remove-btn"
+                    data-fabric-index="${fabric.fabricIndex}"
+                    data-fabric-name="${escapeHtml(fabricDisplayName(fabric))}"
+                    data-last="${fabrics.length === 1}">Remove</button>
+            </li>`).join('');
+
+        list.querySelectorAll('.fabric-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => void removeFabric(btn));
+        });
+    };
+
+    const loadFabrics = async () => {
+        const res = await fetch('/api/fabrics', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderFabrics(data);
+        updateWindowUi(data.window);
+        return data;
+    };
+
+    const removeFabric = async (btn) => {
+        const fabricIndex = btn.dataset.fabricIndex;
+        const name = btn.dataset.fabricName;
+        const isLast = btn.dataset.last === 'true';
+        const warning = isLast
+            ? `Remove ${name}? This is the LAST paired hub — the bridge will return to pairing mode.`
+            : `Remove ${name}? This hub will lose access to all bridged cameras. Also remove the bridge from that hub's app.`;
+        if (!confirm(warning)) return;
+
+        btn.disabled = true;
+        try {
+            const res = await fetch(`/api/fabrics/${fabricIndex}`, { method: 'DELETE' });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+            setStatus(`Removed ${name}.` + (body.commissioned ? '' : ' Bridge is back in pairing mode — reload the page to show the pairing QR code.'));
+            renderFabrics(body);
+        } catch (error) {
+            setStatus(`Failed to remove fabric: ${error}`);
+            btn.disabled = false;
+        }
+    };
+
+    const updateWindowUi = (windowInfo) => {
+        if (!pairingBox) return;
+        const open = Boolean(windowInfo && windowInfo.windowOpen && windowInfo.qrCode);
+        if (closeBtn) closeBtn.hidden = !open;
+        if (openBtn) openBtn.hidden = open;
+        if (!open) {
+            pairingBox.hidden = true;
+            pairingBox.innerHTML = '';
+            stopWindowPoll();
+            return;
+        }
+
+        const expires = windowInfo.expiresAt ? new Date(windowInfo.expiresAt) : null;
+        const expiresText = expires
+            ? `Window closes at ${expires.toLocaleTimeString()} (15 minutes).`
+            : '';
+        pairingBox.hidden = false;
+        pairingBox.innerHTML = `
+            <p class="field-hint">Scan with the additional hub's app. ${expiresText}</p>
+            <img src="${pairingQrImageUrl(windowInfo.qrCode)}" alt="Additional hub pairing QR">
+            <div style="margin-top: 12px;">
+                <small style="color: var(--text-secondary);">Manual code (hub app → Matter → Enter code)</small>
+                <span class="pairing-code">${escapeHtml(windowInfo.manualPairingCode)}</span>
+            </div>`;
+        startWindowPoll();
+    };
+
+    const stopWindowPoll = () => {
+        if (windowPoll) {
+            clearInterval(windowPoll);
+            windowPoll = null;
+        }
+    };
+
+    const startWindowPoll = () => {
+        if (windowPoll) return;
+        windowPoll = setInterval(async () => {
+            try {
+                const data = await loadFabrics();
+                const count = (data.fabrics || []).length;
+                if (knownFabricCount !== null && count > knownFabricCount) {
+                    setStatus('New hub paired successfully.');
+                }
+                knownFabricCount = count;
+                if (!data.window || !data.window.windowOpen) {
+                    stopWindowPoll();
+                }
+            } catch {
+                // transient — keep polling while the window is open
+            }
+        }, 5000);
+    };
+
+    openBtn?.addEventListener('click', async () => {
+        openBtn.disabled = true;
+        setStatus('');
+        try {
+            const res = await fetch('/api/pairing/open-window', { method: 'POST' });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+            updateWindowUi(body);
+        } catch (error) {
+            setStatus(`Failed to open pairing window: ${error}`);
+        } finally {
+            openBtn.disabled = false;
+        }
+    });
+
+    closeBtn?.addEventListener('click', async () => {
+        closeBtn.disabled = true;
+        try {
+            await fetch('/api/pairing/close-window', { method: 'POST' });
+            updateWindowUi(null);
+        } catch (error) {
+            setStatus(`Failed to close pairing window: ${error}`);
+        } finally {
+            closeBtn.disabled = false;
+        }
+    });
+
+    loadFabrics()
+        .then(data => { knownFabricCount = (data.fabrics || []).length; })
+        .catch(error => {
+            list.innerHTML = `<li class="fabric-empty">Failed to load fabrics: ${escapeHtml(String(error))}</li>`;
+        });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     window.MatterCamerasMotionOptions?.initMotionOptions();
     initCameraCards();
     initCameraPreviews();
     initLogs();
     initPairingPanel();
+    initFabricsPanel();
 });

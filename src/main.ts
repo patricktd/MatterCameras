@@ -58,6 +58,18 @@ async function recoverFromStaleFabricIfNeeded(error: unknown, source: string): P
         return true;
     }
 
+    // An operator just removed one fabric on purpose; the removed hub may still
+    // produce fabric-not-found errors. Wiping storage here would destroy every
+    // OTHER hub's pairing, so restart without touching Matter storage instead.
+    if (bridge.recentIntentionalFabricRemoval()) {
+        staleRecoveryInProgress = true;
+        console.error(
+            `[${source}] Fabric-not-found error right after an intentional fabric removal — `
+            + 'restarting without wiping Matter storage (other fabrics stay paired).',
+        );
+        process.exit(0);
+    }
+
     staleRecoveryInProgress = true;
     const storagePath = getMatterStoragePath();
     console.error(

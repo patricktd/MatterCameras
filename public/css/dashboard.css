@@ -1136,6 +1136,67 @@ label {
     min-width: 120px;
 }
 
+.fabrics-section {
+    margin-top: 20px;
+    text-align: left;
+}
+
+.fabrics-section h3 {
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.fabric-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fabric-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--card-bg-soft);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.fabric-item .fabric-remove-btn {
+    flex-shrink: 0;
+}
+
+.fabric-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fabric-info small {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    word-break: break-word;
+}
+
+.fabric-empty {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 10px 2px;
+}
+
+.additional-pairing {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+}
+
 .danger-zone {
     margin-top: 24px;
     padding-top: 20px;

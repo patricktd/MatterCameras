@@ -45,7 +45,7 @@ export function bridgedCameraOptions(camera: Camera) {
             reachable: true,
             vendorName: camera.manufacturer?.trim() || 'RTSP',
             productName: 'RTSP Camera',
-            serialNumber: camera.id,
+            serialNumber: camera.id.slice(0, 32),
             uniqueId: bridgedUniqueId(camera.id, camera.matterBindEpoch),
             hardwareVersion: 1,
             hardwareVersionString: '1.0',

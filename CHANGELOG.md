@@ -8,6 +8,22 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.0-beta] — 2026-07-31
+
+### Added
+
+- **Multi-fabric (multi-admin) support** — the bridge can be paired with several Matter ecosystems at once (SmartThings + Apple Home + Google Home, …):
+  - **Pair another hub** on the dashboard opens a 15-minute Enhanced Commissioning window with a fresh one-time QR / manual pairing code.
+  - **Connected hubs list** shows every fabric with its controller-set label (or known ecosystem name from the vendor ID) via `GET /api/fabrics`.
+  - **Remove fabric** per hub (`DELETE /api/fabrics/:fabricIndex`) — the other hubs keep working; removing the last fabric returns the bridge to pairing mode.
+
+### Fixed
+
+- Stale-fabric crash recovery no longer wipes all Matter storage (and every other hub's pairing) when a fabric-not-found error follows an intentional fabric removal.
+- Bridged device `serialNumber` truncated to 32 characters (Matter Basic Information limit).
+
+---
+
 ## [0.4.2-beta] — 2026-06-29
 
 ### Changed
