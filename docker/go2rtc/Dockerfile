@@ -29,4 +29,8 @@ EXPOSE 1984 8554 8555 8555/udp
 ENTRYPOINT ["/sbin/tini", "--"]
 WORKDIR /config
 
+# Baked default for pre-built / GHCR images (LAN_IP from env). The from-source stack
+# bind-mounts data/go2rtc.yaml over this file, so local builds keep host-generated config.
+COPY go2rtc.yaml /config/go2rtc.yaml
+
 CMD ["go2rtc", "-config", "/config/go2rtc.yaml"]

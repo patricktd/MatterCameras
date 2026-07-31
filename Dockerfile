@@ -18,4 +18,14 @@ ENV NODE_ENV=production
 ENV MATTER_CAMERAS_MANAGED_RESTART=1
 ENV storage.path=/app/data
 
+# Release metadata (set by CI publish-images). Last so version bumps do not bust npm/build cache.
+ARG VERSION=dev
+ARG VCS_REF=
+LABEL org.opencontainers.image.title="Matter Cameras Bridge" \
+      org.opencontainers.image.description="Bridge RTSP/ONVIF cameras as Matter 1.5 camera endpoints" \
+      org.opencontainers.image.source="https://github.com/patricktd/MatterCameras" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.licenses="ISC"
+
 CMD ["node", "dist/main.js"]

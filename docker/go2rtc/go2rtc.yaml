@@ -1,0 +1,21 @@
+# Baked default config for the patched go2rtc image (pre-built / GHCR path).
+# go2rtc expands ${VAR:default} from the container environment BEFORE parsing YAML,
+# so LAN_IP flows in from a plain env var — no bind mount, no entrypoint, no envsubst.
+# The app re-registers stream sources at runtime via PUT /api/streams, so `streams`
+# starts empty here.
+#
+# NOTE: the build-from-source stack (docker-compose.yml) bind-mounts data/go2rtc.yaml
+# over this file, so this default only takes effect on the pre-built image path.
+api:
+  listen: ":3203"
+rtsp:
+  listen: ":8554"
+webrtc:
+  listen: ":8555"
+  candidates:
+    - "${LAN_IP:127.0.0.1}:8555"
+  ice_servers: []
+  filters:
+    networks: [udp4]
+    ips: ["${LAN_IP:127.0.0.1}"]
+streams: {}

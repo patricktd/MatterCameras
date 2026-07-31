@@ -1,6 +1,8 @@
 import { compareVersions, isNewerVersion } from '../utils/compareVersions.js';
 
-const GITHUB_REPO = 'patricktd/MatterCameras';
+// Repo polled for release/update notifications. Defaults to upstream; override with
+// GITHUB_REPO (e.g. a fork) via docker-compose / .env without editing source.
+const GITHUB_REPO = process.env.GITHUB_REPO?.trim() || 'patricktd/MatterCameras';
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 interface GitHubRelease {

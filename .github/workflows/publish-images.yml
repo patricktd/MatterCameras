@@ -1,0 +1,88 @@
+name: publish-images
+run-name: publish images ${{ github.ref_name }}
+
+# Builds multi-arch images and pushes them to GHCR when a version tag is pushed.
+# Does NOT bump package.json, edit CHANGELOG, or create the GitHub Release —
+# keep those steps local (`npm run release` → commit → tag → `gh release create`).
+#
+# Trigger: push an annotated tag matching v* (e.g. v0.5.0-beta).
+#
+# NOTE: GHCR packages are PRIVATE by default. After the first successful run,
+# open each package on GitHub and set visibility to Public so users can pull.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to build (e.g. v0.5.0-beta). Leave empty to use the current ref.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-images
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.tag || github.ref) || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve version & owner
+        id: meta
+        env:
+          OWNER: ${{ github.repository_owner }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$DISPATCH_TAG" ]; then
+            TAG="$DISPATCH_TAG"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push app image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ steps.meta.outputs.tag }}
+            VCS_REF=${{ steps.meta.outputs.sha }}
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/mattercameras:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/mattercameras:latest
+
+      - name: Build & push go2rtc image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/go2rtc
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/matter-go2rtc:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/matter-go2rtc:latest

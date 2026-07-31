@@ -6,6 +6,16 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- Optional **pre-built image** install path via GHCR (`docker-compose.cli.yml`, `docker-compose.casaos.yml`) alongside the existing build-from-source flow.
+- GitHub Actions: `ci` (test/build on push/PR) and `publish-images` (multi-arch push to GHCR on `v*` tags — does not take over local release/versioning).
+- `GITHUB_REPO` environment variable to choose which repository the Web UI polls for update notifications (default remains upstream).
+
+### Changed
+
+- Web UI shows **Update now** only when one-click self-update is available (git clone + Docker path); image-only installs see the release link / pull instructions instead.
+
 ---
 
 ## [0.5.0-beta] — 2026-07-31

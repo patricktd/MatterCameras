@@ -25,7 +25,7 @@
         let action = '';
         if (data.updateInProgress) {
             action = '<span class="update-banner__status">Updating…</span>';
-        } else {
+        } else if (data.canAutoUpdate) {
             action = `<button type="button" class="btn btn-sm" id="apply-update-btn">Update now</button>`;
         }
 

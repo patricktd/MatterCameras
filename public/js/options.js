@@ -21,8 +21,10 @@ async function initSoftwareUpdates() {
         }
 
         if (data.updateAvailable && data.latestVersion) {
-            statusEl.textContent = `v${data.latestVersion} is available (running v${data.currentVersion}).`;
-            if (applyBtn) {
+            statusEl.textContent = data.canAutoUpdate
+                ? `v${data.latestVersion} is available (running v${data.currentVersion}).`
+                : `v${data.latestVersion} is available (running v${data.currentVersion}). Pull a newer image to update (this install has no one-click self-update).`;
+            if (applyBtn && data.canAutoUpdate) {
                 applyBtn.hidden = false;
                 applyBtn.onclick = async () => {
                     if (!confirm(`Install v${data.latestVersion} now? The bridge will restart.`)) return;
