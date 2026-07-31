@@ -6,6 +6,7 @@
     <% const restartPending = typeof bridgeRestartPending !== 'undefined' && bridgeRestartPending; %>
     <button type="submit"
         class="btn btn-sm <%= restartPending ? 'btn-restart-required' : 'btn-ghost' %>">
+        <span class="material-symbols-outlined">restart_alt</span>
         <%= restartPending ? 'Restart Required' : 'Restart Bridge' %>
     </button>
 </form>

@@ -104,10 +104,20 @@ function installStaleFabricRecoveryHooks() {
 }
 
 async function main() {
+    if (process.argv.includes('--reset-password')) {
+        const { initAuthDb, resetAdminPassword } = await import('./auth/authDb.js');
+        await initAuthDb();
+        await resetAdminPassword();
+        process.exit(0);
+    }
+
     console.log(`Starting Matter Cameras Bridge v${appVersion}...`);
     console.log(`Matter host: ${appConfig.matterHost}:${appConfig.matterPort}`);
     console.log(`Web UI: http://0.0.0.0:${appConfig.webPort}`);
     console.log(`go2rtc: ${appConfig.go2rtcUrl}`);
+
+    const { initAuthDb } = await import('./auth/authDb.js');
+    await initAuthDb();
 
     await storage.init();
     await settings.init();

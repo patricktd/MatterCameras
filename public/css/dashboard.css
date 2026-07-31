@@ -1,9 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+    font-size: 1.1em;
+    line-height: 1;
+    user-select: none;
+}
+
 :root {
     --bg-color: #edf4fb;
     --card-bg: #ffffff;
     --card-bg-soft: #f7fbff;
     --text-primary: #13243d;
-    --text-secondary: #5b6d83;
+    --text-secondary: #4a5a6e;
     --accent: #2563eb;
     --accent-soft: rgba(37, 99, 235, 0.12);
     --danger: #ef4444;
@@ -688,8 +699,8 @@ a.btn-ghost:visited {
     padding: 0 12px;
     border-radius: 999px;
     border: 1px solid rgba(148, 163, 184, 0.16);
-    background: rgba(15, 23, 42, 0.36);
-    color: var(--text-secondary);
+    background: #eef4ff;
+    color: #1e40af;
     font-size: 0.82rem;
     font-weight: 600;
 }
@@ -701,9 +712,9 @@ a.btn-ghost:visited {
 
 .wizard-section {
     padding: 20px;
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    border: 1px solid rgba(37, 99, 235, 0.12);
     border-radius: 16px;
-    background: rgba(15, 23, 42, 0.2);
+    background: rgba(37, 99, 235, 0.04);
 }
 
 .wizard-section__head {
@@ -727,7 +738,7 @@ a.btn-ghost:visited {
     height: 32px;
     border-radius: 999px;
     background: var(--accent-soft);
-    color: #bfdbfe;
+    color: #1e40af;
     font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -1283,6 +1294,41 @@ label {
     font-size: 0.75rem;
     color: var(--success);
     margin-left: 8px;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeInUp 0.25s ease;
+}
+
+.camera-card {
+    animation: fadeInUp 0.3s ease both;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.camera-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 24px 52px rgba(148, 163, 184, 0.22);
+}
+
+.btn .material-symbols-outlined {
+    font-size: 1rem;
+    margin-right: 4px;
+}
+
+.btn-icon-only .material-symbols-outlined {
+    margin-right: 0;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 @media (max-width: 768px) {
