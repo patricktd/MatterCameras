@@ -61,8 +61,8 @@ volumes:
 
 x-casaos:
   architectures:
+    # App image is amd64-only until native arm64 CI is available (see publish-images.yml).
     - amd64
-    - arm64
   main: app
   author: patricktd
   developer: patricktd

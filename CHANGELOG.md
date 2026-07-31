@@ -9,7 +9,7 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 ### Added
 
 - Optional **pre-built image** install path via GHCR (`docker-compose.cli.yml`, `docker-compose.casaos.yml`) alongside the existing build-from-source flow.
-- GitHub Actions: `ci` (test/build on push/PR) and `publish-images` (multi-arch push to GHCR on `v*` tags — does not take over local release/versioning).
+- GitHub Actions: `ci` (test/build on push/PR) and `publish-images` (push to GHCR on `v*` tags — does not take over local release/versioning). App image is **amd64** for now; go2rtc is amd64+arm64.
 - `GITHUB_REPO` environment variable to choose which repository the Web UI polls for update notifications (default remains upstream).
 
 ### Changed

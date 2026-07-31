@@ -64,12 +64,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # App image: amd64 only for now. arm64 under QEMU rebuilds native npm modules and
+      # routinely hangs for 1h+ on GitHub runners (better-sqlite3 / toolchain, etc.).
+      # Revisit with a native arm64 runner or prebuilt native deps before re-enabling.
       - name: Build & push app image
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
+          provenance: false
           build-args: |
             VERSION=${{ steps.meta.outputs.tag }}
             VCS_REF=${{ steps.meta.outputs.sha }}
@@ -77,12 +81,14 @@ jobs:
             ghcr.io/${{ steps.meta.outputs.owner }}/mattercameras:${{ steps.meta.outputs.tag }}
             ghcr.io/${{ steps.meta.outputs.owner }}/mattercameras:latest
 
+      # go2rtc is Go with CGO_ENABLED=0 — cross-compiles cleanly for both arches.
       - name: Build & push go2rtc image
         uses: docker/build-push-action@v7
         with:
           context: docker/go2rtc
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: false
           tags: |
             ghcr.io/${{ steps.meta.outputs.owner }}/matter-go2rtc:${{ steps.meta.outputs.tag }}
             ghcr.io/${{ steps.meta.outputs.owner }}/matter-go2rtc:latest
