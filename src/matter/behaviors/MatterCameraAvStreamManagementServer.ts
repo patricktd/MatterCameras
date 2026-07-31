@@ -1,6 +1,6 @@
 import { CameraAvStreamManagementServer as BaseCameraAvStreamManagementServer } from '@matter/main/behaviors/camera-av-stream-management';
 import { CameraAvStreamManagement } from '@matter/types/clusters/camera-av-stream-management';
-import { StreamUsage } from '@matter/types';
+import { Status, StatusResponseError, StreamUsage } from '@matter/types';
 import { Logger } from '@matter/general';
 import { normalizeJpeg, readJpegDimensions } from '../../streaming/normalizeJpeg.js';
 import { imageTransformFromMatterState } from '../../streaming/imageTransform.js';
@@ -56,12 +56,22 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
 
     override async setStreamPriorities(request: CameraAvStreamManagement.SetStreamPrioritiesRequest) {
         if (request.streamPriorities?.length) {
-            this.state.streamUsagePriorities = request.streamPriorities;
+            const allowed = request.streamPriorities.filter(usage => usage === StreamUsage.LiveView);
+            this.state.streamUsagePriorities = allowed.length ? allowed : [StreamUsage.LiveView];
         }
+    }
+
+    #assertLiveViewUsage(usage: StreamUsage, command: string): void {
+        if (usage === StreamUsage.LiveView) return;
+        throw new StatusResponseError(
+            `${command}: streamUsage=${usage} unsupported (LiveView only until Push AV Stream Transport)`,
+            Status.ConstraintError,
+        );
     }
 
     override async audioStreamAllocate(request: CameraAvStreamManagement.AudioStreamAllocateRequest) {
         const usage = request.streamUsage ?? StreamUsage.LiveView;
+        this.#assertLiveViewUsage(usage, 'AudioStreamAllocate');
         const streams = [...(this.state.allocatedAudioStreams ?? [])];
         const existing = streams.find(s => s.streamUsage === usage);
         if (existing) {
@@ -69,9 +79,6 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         }
 
         const stream = createDefaultAudioStream(usage);
-        if (usage === StreamUsage.Recording) {
-            stream.audioStreamId = 2;
-        }
         stream.audioCodec = request.audioCodec ?? stream.audioCodec;
         stream.channelCount = request.channelCount ?? stream.channelCount;
         stream.sampleRate = request.sampleRate ?? stream.sampleRate;
@@ -90,7 +97,7 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
 
     override async videoStreamAllocate(request: CameraAvStreamManagement.VideoStreamAllocateRequest) {
         const usage = request.streamUsage ?? StreamUsage.LiveView;
-        const cameraId = String(this.endpoint.id);
+        this.#assertLiveViewUsage(usage, 'VideoStreamAllocate');
         const streams = [...(this.state.allocatedVideoStreams ?? [])];
 
         const existing = streams.find(s => s.streamUsage === usage);
@@ -99,16 +106,7 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         }
 
         const stream = createDefaultVideoStream(usage);
-        if (usage === StreamUsage.Recording) {
-            stream.videoStreamId = 2;
-            logger.info(
-                `VideoStreamAllocate Recording camera=${cameraId} streamId=2 `
-                + '(Push AV Stream Transport not implemented — cloud recording will not upload clips)',
-            );
-        } else {
-            stream.videoStreamId = 1;
-        }
-
+        stream.videoStreamId = 1;
         streams.push(stream);
         this.state.allocatedVideoStreams = streams;
         return new AvMgmt.VideoStreamAllocateResponse({ videoStreamId: stream.videoStreamId });

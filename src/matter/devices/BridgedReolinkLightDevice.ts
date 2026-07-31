@@ -31,6 +31,7 @@ export function bridgedReolinkLightOptions(camera: Camera) {
             hardwareVersionString: '1.0',
             softwareVersion: getMatterSoftwareVersion(),
             softwareVersionString: getMatterSoftwareVersionString(),
+            configurationVersion: 1,
         },
         onOff: {
             onOff: false,

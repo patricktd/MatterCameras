@@ -15,6 +15,10 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ### Changed
 
+- Upgraded **matter.js** (`@matter/*`) from 0.17.3 to **0.17.7** (Matter 1.6 model; no breaking device API changes).
+- Structure announces now bump Matter **`configurationVersion`** (root + bridged) alongside `softwareVersion` / `PartsList`.
+- OccupancySensing enables the **OccupancyEvent** feature so hubs receive `OccupancyChanged` on motion state flips.
+- Cameras advertise **LiveView only** for stream usages (Recording deferred until Push AV Stream Transport).
 - Web UI shows **Update now** only when one-click self-update is available (git clone + Docker path); image-only installs see the release link / pull instructions instead.
 - Dashboard contrast and light motion polish (wizard chips, card hover, focus rings); system font stack instead of remote Inter.
 

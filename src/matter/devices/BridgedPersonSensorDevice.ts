@@ -9,7 +9,7 @@ import { bridgedUniqueId } from '../bridgedUniqueId.js';
 
 export const BridgedPersonSensorDevice = OccupancySensorDevice.with(
     BridgedDeviceBasicInformationServer,
-    OccupancySensingServer.with('PassiveInfrared'),
+    OccupancySensingServer.with('PassiveInfrared', 'OccupancyEvent'),
 );
 
 export function bridgedPersonSensorOptions(camera: Camera) {
@@ -29,6 +29,7 @@ export function bridgedPersonSensorOptions(camera: Camera) {
             hardwareVersionString: '1.0',
             softwareVersion: getMatterSoftwareVersion(),
             softwareVersionString: getMatterSoftwareVersionString(),
+            configurationVersion: 1,
         },
         occupancySensing: occupancySensingDefaults(),
     };

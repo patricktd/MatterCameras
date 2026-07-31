@@ -87,8 +87,16 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
             throw new Error('ProvideOffer missing SDP');
         }
 
+        const streamUsage = request.streamUsage ?? StreamUsage.LiveView;
+        if (streamUsage !== StreamUsage.LiveView) {
+            throw new StatusResponseError(
+                `ProvideOffer: streamUsage=${streamUsage} unsupported (LiveView only until Push AV Stream Transport)`,
+                Status.ConstraintError,
+            );
+        }
+
         const cameraId = String(this.endpoint.id);
-    logHubEndpointAdoption(cameraId, 'provideOffer');
+        logHubEndpointAdoption(cameraId, 'provideOffer');
         const sessionId = this.#allocateSessionId(request.webRtcSessionId);
         const hubEndpoint = this.#hubEndpoint(request.originatingEndpointId);
         const hubIceServers = request.iceServers?.length ?? 0;

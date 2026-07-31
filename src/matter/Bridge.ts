@@ -84,7 +84,7 @@ export class MatterBridge {
     }
 
     async init() {
-        console.log('Initializing Matter Bridge (matter.js 0.17 / Matter 1.5)...');
+        console.log('Initializing Matter Bridge (matter.js 0.17.7 / Matter 1.5 camera, SDK 1.6)...');
 
         this.server = await ServerNode.create({
             id: 'matter-cameras-bridge',
@@ -95,6 +95,7 @@ export class MatterBridge {
                 productName: appConfig.vendor.productName,
                 serialNumber: 'MC-BRIDGE-001',
                 uniqueId: 'MatterCameras-Bridge',
+                configurationVersion: 1,
             },
             network: {
                 port: appConfig.matterPort,
@@ -129,7 +130,7 @@ export class MatterBridge {
         console.log(`Matter Bridge online at ${appConfig.matterHost}:${appConfig.matterPort}`);
     }
 
-    /** Bump softwareVersion + re-report PartsList so hubs re-discover bridged cameras. */
+    /** Bump softwareVersion/configurationVersion + re-report PartsList so hubs re-discover bridged cameras. */
     async notifyHubStructureChange() {
         await this.#announceStructureToHub();
     }
@@ -140,6 +141,7 @@ export class MatterBridge {
         const version = getMatterSoftwareVersion();
         const versionString = getMatterSoftwareVersionString();
         const versionState = { softwareVersion: version, softwareVersionString: versionString };
+        let configurationVersion = 0;
 
         try {
             await this.server.setStateOf(BasicInformationServer, versionState);
@@ -150,13 +152,37 @@ export class MatterBridge {
             await this.aggregator.setStateOf(DescriptorServer, {
                 partsList: this.#aggregatorPartNumbers(),
             });
+
+            // Matter 1.6: ConfigurationVersion tells controllers the node topology/config changed.
+            // Group bridged bumps under one bridge increment (shared ActionContext).
+            await this.server.act(async agent => {
+                const basic = agent.get(BasicInformationServer);
+                await basic.increaseConfigurationVersion(async context => {
+                    for (const endpoint of this.cameraEndpoints.values()) {
+                        try {
+                            await endpoint.act(async epAgent => {
+                                const bridged = epAgent.get(BridgedDeviceBasicInformationServer);
+                                // Enable on endpoints persisted before we started advertising the attribute.
+                                if (bridged.state.configurationVersion === undefined) {
+                                    bridged.state.configurationVersion = 1;
+                                }
+                                await bridged.increaseConfigurationVersion(undefined, context);
+                            });
+                        } catch (error) {
+                            console.warn(`configurationVersion bump skipped for ${endpoint.id}: ${error}`);
+                        }
+                    }
+                });
+                configurationVersion = basic.state.configurationVersion ?? 0;
+            });
         } catch (error) {
             console.warn(`Bridge structure announce failed: ${error}`);
         }
 
         const partNumbers = this.#aggregatorPartNumbers();
         const msg = `Bridge structure: ${this.cameraEndpoints.size} bridged endpoint(s), `
-            + `softwareVersion=${version}, Matter endpoints=[${partNumbers.join(', ')}]`;
+            + `softwareVersion=${version}, configurationVersion=${configurationVersion}, `
+            + `Matter endpoints=[${partNumbers.join(', ')}]`;
         console.log(msg);
     }
 

@@ -15,7 +15,7 @@ Status below reflects bridge implementation and **hub/app** behavior on a Matter
 | **Notification image** | `CaptureSnapshot` | OK | **OK** — JPEG in push notification (hub-dependent) |
 | Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | frame-diff or ONVIF | Hub reprofile (`softwareVersion` 301+) or newer drivers |
 | ONVIF discovery | REST + Web UI | WS-Discovery UDP 3702 | Requires Docker host networking |
-| Cloud recording plan | **Push AV Stream Transport** `0x0555` | **Not implemented** | Some hubs show plan UI; **no clips upload** |
+| Cloud recording plan | **Push AV Stream Transport** `0x0555` | **Not implemented** — `Recording` stream usage is **not advertised** | Some hubs show plan UI; **no clips upload** |
 
 ---
 
@@ -150,8 +150,8 @@ Some hubs (e.g. SmartThings) offer a subscription plan to select up to **4 camer
 
 | Step | Status |
 |------|--------|
-| `supportedStreamUsages` includes `Recording` | Yes (advertised) |
-| `VideoStreamAllocate(Recording)` | Logs + allocates stream id 2 |
+| `supportedStreamUsages` includes `Recording` | **No** — LiveView only until Push AV lands |
+| `VideoStreamAllocate(Recording)` | Rejected (`ConstraintError`) |
 | **Push AV Stream Transport cluster** | **Missing** |
 | CMAF encoder + HTTPS upload | **Missing** |
 | TLS Client Management | **Missing** |
@@ -166,11 +166,7 @@ Over 7 days of production logs:
 
 Conclusion: the hub never started a push transport with this bridge. A recording plan UI may be shown at the **account/plan** level on some platforms, but without Push AV Stream the bridge cannot upload clips. Implementing recording is a **large follow-up** (CMAF pipeline + TLS + time sync), not a small fix.
 
-When the hub eventually requests recording streams, logs will show:
-
-```
-VideoStreamAllocate Recording camera=cam-… (Push AV Stream Transport not implemented — …)
-```
+If a hub still requests Recording (legacy expectation), allocate/ProvideOffer returns `ConstraintError` until Push AV is implemented.
 
 ---
 

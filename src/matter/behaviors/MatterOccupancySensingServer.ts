@@ -5,7 +5,8 @@ import { OccupancySensing } from '@matter/types/clusters/occupancy-sensing';
 const Os = OccupancySensing;
 const logger = Logger.get('OccupancySensing');
 
-const OccServer = CameraRequirements.OccupancySensingServer.with('PassiveInfrared');
+/** OccupancyEvent makes matter.js emit OccupancyChanged when `occupancy` flips. */
+const OccServer = CameraRequirements.OccupancySensingServer.with('PassiveInfrared', 'OccupancyEvent');
 
 /**
  * SmartThings routine "Motion detected" maps to OccupancySensing.occupied on Matter cameras.

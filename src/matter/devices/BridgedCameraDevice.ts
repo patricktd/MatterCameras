@@ -51,6 +51,7 @@ export function bridgedCameraOptions(camera: Camera) {
             hardwareVersionString: '1.0',
             softwareVersion: getMatterSoftwareVersion(),
             softwareVersionString: getMatterSoftwareVersionString(),
+            configurationVersion: 1,
         },
         cameraAvStreamManagement: cameraAvStreamDefaults(),
         zoneManagement: zoneManagementDefaults(),
