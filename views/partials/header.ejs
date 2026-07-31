@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Matter Cameras Bridge — <%= typeof pageTitle !== 'undefined' ? pageTitle : 'Dashboard' %></title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <link rel="stylesheet" href="/css/dashboard.css">
     <% if (typeof extraStylesheets !== 'undefined' && Array.isArray(extraStylesheets)) { %>
         <% extraStylesheets.forEach(stylesheet => { %>
@@ -17,7 +18,7 @@
     <div class="container">
         <header>
             <div class="header-title">
-                <h1><a href="/" class="header-home-link">Matter Cameras Bridge</a></h1>
+                <h1><a href="/" class="header-home-link"><img src="/images/logo.svg" alt="" class="header-logo">Matter Cameras Bridge</a></h1>
                 <% if (typeof pageTitle !== 'undefined' && pageTitle !== 'Dashboard') { %>
                     <span class="header-page-title"><%= pageTitle %></span>
                 <% } %>
@@ -32,13 +33,13 @@
                 </div>
                 <div class="header-actions">
                     <% if (typeof activePage === 'undefined' || activePage !== 'dashboard') { %>
-                        <a href="/" class="btn btn-secondary btn-sm">Dashboard</a>
+                        <a href="/" class="btn btn-secondary btn-sm"><span class="material-symbols-outlined">dashboard</span> Dashboard</a>
                     <% } %>
                     <% if (typeof activePage === 'undefined' || activePage !== 'add-camera') { %>
-                        <a href="/cameras/add" class="btn btn-sm">Add Camera</a>
+                        <a href="/cameras/add" class="btn btn-sm"><span class="material-symbols-outlined">add_circle</span> Add Camera</a>
                     <% } %>
                     <% if (typeof activePage === 'undefined' || activePage !== 'options') { %>
-                        <a href="/options" class="btn btn-ghost btn-sm">Options</a>
+                        <a href="/options" class="btn btn-ghost btn-sm"><span class="material-symbols-outlined">settings</span> Options</a>
                     <% } %>
                     <%- include('bridge-restart-form', { returnTo: typeof returnTo !== 'undefined' ? returnTo : '', bridgeRestartPending }) %>
                 </div>

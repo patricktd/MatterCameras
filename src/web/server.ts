@@ -1,5 +1,6 @@
 import express from 'express';
 import { join } from 'path';
+import { randomUUID } from 'node:crypto';
 import { PROJECT_ROOT } from '../config/paths.js';
 import { storage } from '../storage/db.js';
 import { settings } from '../storage/settings.js';
@@ -611,7 +612,8 @@ app.post('/api/cameras', async (req, res) => {
     try {
         const motionFields = sanitizeCameraMotionFields(req.body as Record<string, unknown>);
         const config: Camera = {
-            id: 'cam-' + Date.now(),
+            // UUID avoids collisions when two creates land in the same millisecond.
+            id: 'cam-' + randomUUID().replace(/-/g, '').slice(0, 12),
             name: req.body.name,
             rtspUrl: req.body.rtspUrl,
             codec: req.body.codec,
@@ -694,7 +696,7 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
     }
 
     const config: Camera = {
-        id: 'cam-' + Date.now(),
+        id: 'cam-' + randomUUID().replace(/-/g, '').slice(0, 12),
         name,
         rtspUrl: existing.rtspUrl,
         codec: existing.codec,

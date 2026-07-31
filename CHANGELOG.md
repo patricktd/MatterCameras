@@ -11,10 +11,16 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 - Optional **pre-built image** install path via GHCR (`docker-compose.cli.yml`, `docker-compose.casaos.yml`) alongside the existing build-from-source flow.
 - GitHub Actions: `ci` (test/build on push/PR) and `publish-images` (push to GHCR on `v*` tags — does not take over local release/versioning). App image is **amd64** for now; go2rtc is amd64+arm64.
 - `GITHUB_REPO` environment variable to choose which repository the Web UI polls for update notifications (default remains upstream).
+- Web UI branding: simple **MC** logo (camera → hub) in the header/favicon, plus Material Symbols icons self-hosted under `public/fonts/` (no Google Fonts CDN).
 
 ### Changed
 
 - Web UI shows **Update now** only when one-click self-update is available (git clone + Docker path); image-only installs see the release link / pull instructions instead.
+- Dashboard contrast and light motion polish (wizard chips, card hover, focus rings); system font stack instead of remote Inter.
+
+### Fixed
+
+- Creating, duplicating, or bulk-importing a camera no longer collides on `Date.now()` IDs (uses a short UUID); double-clicks are ignored while Add Camera / Duplicate submits.
 
 ---
 

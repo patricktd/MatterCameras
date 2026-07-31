@@ -73,7 +73,7 @@ x-casaos:
     en_us: RTSP/ONVIF cameras as Matter 1.5 cameras.
   title:
     custom: Matter Cameras Bridge
-  icon: https://github.com/patricktd/MatterCameras/blob/main/docs/images/dashboard.png?raw=true
+  icon: https://github.com/patricktd/MatterCameras/blob/main/public/images/logo.svg?raw=true
   scheme: http
   hostname: ""
   port_map: "3202"

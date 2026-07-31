@@ -1,12 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import type { Camera } from '../types/index.js';
 import type { ResolvedCameraDraft } from './types.js';
 
-let cameraIdSeq = 0;
-
 export function draftToCamera(draft: ResolvedCameraDraft): Camera {
-    cameraIdSeq += 1;
     return {
-        id: `cam-${Date.now()}-${cameraIdSeq}`,
+        // Same scheme as POST /api/cameras — avoid Date.now() collisions on bulk import.
+        id: 'cam-' + randomUUID().replace(/-/g, '').slice(0, 12),
         name: draft.name,
         rtspUrl: draft.rtspUrl,
         motionSource: draft.suggestedMotionSource ?? 'auto',

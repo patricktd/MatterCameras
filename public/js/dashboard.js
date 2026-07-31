@@ -75,9 +75,14 @@ function initCameraCards() {
         });
 
         card.querySelector('.btn-duplicate')?.addEventListener('click', (e) => {
-            const sourceName = e.currentTarget.dataset.sourceName || 'camera';
+            const btn = e.currentTarget;
+            if (btn.disabled) return;
+
+            const sourceName = btn.dataset.sourceName || 'camera';
             const name = prompt(`Name for the duplicate of "${sourceName}":`, `${sourceName} (copy)`);
             if (!name?.trim()) return;
+
+            btn.disabled = true;
 
             const form = document.createElement('form');
             form.method = 'POST';
