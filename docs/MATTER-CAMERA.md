@@ -188,9 +188,18 @@ Platform-specific automation UIs differ. Example for **SmartThings**:
 
 ---
 
-## Matter 1.5.1 (not available yet)
+## Matter 1.5.1 / HEIC (partially available in SDK)
 
-CSA maintenance release adds multi-stream delivery, HEIC snapshots, and HLS/DASH CMAF upload. Requires Matter SDK 1.5.1, hub firmware support, and bridge implementation (especially **Push AV Stream** for recording). See [matter-smarthome.de overview](https://matter-smarthome.de/en/development/matter-1-5-1-camera-refinements-and-more-flexibility/).
+CSA maintenance release adds multi-stream delivery, HEIC snapshots, and HLS/DASH CMAF upload.
+
+| Piece | Status |
+|-------|--------|
+| matter.js model (`ImageCodec.Heic`, Push AV types) | Present in **0.17.9** / Matter 1.6 data model |
+| Bridge advertises HEIC in `snapshotCapabilities` | **No** — go2rtc snapshots are JPEG only |
+| `SnapshotStreamAllocate` non-JPEG | Rejected with `ConstraintError` |
+| Multi-stream / Push AV recording | **Not implemented** |
+
+Requires hub firmware support plus bridge work (HEIC encoder and/or Push AV + CMAF + TLS Client). See [matter-smarthome.de overview](https://matter-smarthome.de/en/development/matter-1-5-1-camera-refinements-and-more-flexibility/).
 
 ---
 

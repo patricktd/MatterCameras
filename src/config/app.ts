@@ -37,7 +37,10 @@ const defaults: AppConfig = {
     vendor: {
         vendorId: Number(process.env.MATTER_VENDOR_ID ?? 0xfff1),
         vendorName: 'patricktd',
-        productId: Number(process.env.MATTER_PRODUCT_ID ?? 0x8000),
+        // Project-specific PID under the Matter test VID. Do not use matter.js's
+        // generic 0x8000 default: SmartThings manufacturer fingerprints can
+        // otherwise bind this bridge to an unrelated custom Edge driver.
+        productId: Number(process.env.MATTER_PRODUCT_ID ?? 0xca42),
         productName: 'Matter Cameras Bridge',
     },
 };

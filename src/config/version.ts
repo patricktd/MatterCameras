@@ -8,7 +8,8 @@ export const appVersion: string = JSON.parse(
     readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8'),
 ).version as string;
 
-const SOFTWARE_VERSION_BASE = 300;
+/** Bump when Matter cluster advertising / SDK behavior changes enough to warrant hub re-interview. */
+const SOFTWARE_VERSION_BASE = 310;
 
 let bridgeEndpointCount = 0;
 

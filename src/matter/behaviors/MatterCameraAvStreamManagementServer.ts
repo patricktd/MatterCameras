@@ -119,13 +119,22 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
     }
 
     override async snapshotStreamAllocate(request: CameraAvStreamManagement.SnapshotStreamAllocateRequest) {
+        // JPEG only until we have a HEIC encoder path (Matter 1.5.1 ImageCodec.Heic is optional).
+        const requestedCodec = request.imageCodec ?? AvMgmt.ImageCodec.Jpeg;
+        if (requestedCodec !== AvMgmt.ImageCodec.Jpeg) {
+            throw new StatusResponseError(
+                `SnapshotStreamAllocate: imageCodec=${requestedCodec} unsupported (JPEG only; HEIC deferred)`,
+                Status.ConstraintError,
+            );
+        }
+
         const streams = this.state.allocatedSnapshotStreams ?? [];
         if (streams.length > 0) {
             return new AvMgmt.SnapshotStreamAllocateResponse({ snapshotStreamId: streams[0].snapshotStreamId });
         }
 
         const stream = createDefaultSnapshotStream();
-        stream.imageCodec = request.imageCodec ?? stream.imageCodec;
+        stream.imageCodec = AvMgmt.ImageCodec.Jpeg;
         stream.frameRate = request.maxFrameRate ?? stream.frameRate;
         stream.minResolution = request.minResolution ?? stream.minResolution;
         stream.maxResolution = request.maxResolution ?? stream.maxResolution;

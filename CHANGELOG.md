@@ -6,6 +6,10 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ## [Unreleased]
 
+---
+
+## [0.5.1-beta] — 2026-08-07
+
 ### Added
 
 - Optional **pre-built image** install path via GHCR (`docker-compose.cli.yml`, `docker-compose.casaos.yml`) alongside the existing build-from-source flow.
@@ -15,6 +19,10 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ### Changed
 
+- Upgraded **matter.js** (`@matter/*`) from 0.17.7 to **0.17.9** (subscription/session reliability + MRP fixes).
+- Bridge advertises explicit Matter 1.6 **CapabilityMinima** sized for a multi-camera aggregator (higher read/subscribe path counts).
+- `SnapshotStreamAllocate` rejects non-JPEG codecs with `ConstraintError` (HEIC deferred until an encoder exists).
+- Matter `softwareVersion` base bumped to **310** so hubs re-interview after the SDK/capability change.
 - Upgraded **matter.js** (`@matter/*`) from 0.17.3 to **0.17.7** (Matter 1.6 model; no breaking device API changes).
 - Structure announces now bump Matter **`configurationVersion`** (root + bridged) alongside `softwareVersion` / `PartsList`.
 - OccupancySensing enables the **OccupancyEvent** feature so hubs receive `OccupancyChanged` on motion state flips.
@@ -24,6 +32,8 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ### Fixed
 
+- Root **BasicInformation** now sets `hardwareVersion` / `softwareVersion` at `ServerNode.create` (seeded from the camera roster), preventing SmartThings from seeing a transient `softwareVersion=0` and showing a persistent firmware-update indicator.
+- New installations use the project-specific Matter Product ID `0xCA42` instead of matter.js's generic test value `0x8000`, preventing unrelated SmartThings Edge drivers from claiming the bridge by manufacturer fingerprint. Existing pairings remain intact; `MATTER_PRODUCT_ID` remains configurable.
 - Creating, duplicating, or bulk-importing a camera no longer collides on `Date.now()` IDs (uses a short UUID); double-clicks are ignored while Add Camera / Duplicate submits.
 
 ---
@@ -175,7 +185,9 @@ First public beta under the **Matter Cameras Bridge** name.
 
 ---
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.4.2-beta...HEAD
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.1-beta...HEAD
+[0.5.1-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.0-beta...v0.5.1-beta
+[0.5.0-beta]: https://github.com/patricktd/MatterCameras/compare/v0.4.2-beta...v0.5.0-beta
 [0.4.2-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.2-beta
 [0.4.1-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.1-beta
 [0.4.0-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.0-beta

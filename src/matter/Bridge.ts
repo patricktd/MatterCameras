@@ -84,7 +84,7 @@ export class MatterBridge {
     }
 
     async init() {
-        console.log('Initializing Matter Bridge (matter.js 0.17.7 / Matter 1.5 camera, SDK 1.6)...');
+        console.log('Initializing Matter Bridge (matter.js 0.17.9 / Matter 1.5 camera, SDK 1.6)...');
 
         this.server = await ServerNode.create({
             id: 'matter-cameras-bridge',
@@ -96,6 +96,21 @@ export class MatterBridge {
                 serialNumber: 'MC-BRIDGE-001',
                 uniqueId: 'MatterCameras-Bridge',
                 configurationVersion: 1,
+                // Set at create so StartUp / hub interview never see development defaults (0).
+                // SmartThings treats softwareVersion 0 → N as an in-progress firmware update icon.
+                hardwareVersion: 1,
+                hardwareVersionString: '1.0',
+                softwareVersion: getMatterSoftwareVersion(),
+                softwareVersionString: getMatterSoftwareVersionString(),
+                // Matter 1.6 CapabilityMinima — sized for a multi-camera aggregator.
+                capabilityMinima: {
+                    caseSessionsPerFabric: 3,
+                    subscriptionsPerFabric: 15,
+                    simultaneousInvocationsSupported: 32,
+                    simultaneousWritesSupported: 32,
+                    readPathsSupported: 64,
+                    subscribePathsSupported: 64,
+                },
             },
             network: {
                 port: appConfig.matterPort,

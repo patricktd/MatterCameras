@@ -113,6 +113,10 @@ async function main() {
     await settings.init();
     await settings.clearBridgeRestartPending();
 
+    // Seed Matter softwareVersion before ServerNode.create — otherwise StartUp emits
+    // softwareVersion=0 and SmartThings shows a persistent "updating / not up to date" icon.
+    setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
+
     try {
         await bridge.init();
     } catch (error) {

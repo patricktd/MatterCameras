@@ -42,6 +42,7 @@ docs/AGENT-CONTEXT.md
 /scripts/npm-deploy.mjs
 /scripts/watch-webrtc-logs.sh
 /scripts/resolve-deploy-bash.ps1
+/scripts/resolve-deploy-bash.sh
 /scripts/install-deploy-ssh-key.ps1
 /deploy.env.example
 /docs/DEPLOY.md

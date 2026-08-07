@@ -117,6 +117,17 @@ Notes:
 - When removing a hub, also delete the bridge from that hub's app; the hub is not otherwise notified
   beyond its sessions being closed.
 
+## Matter product identity
+
+New installations use test VID `0xFFF1` with the project-specific PID `0xCA42`.
+Earlier releases used matter.js's generic PID `0x8000`, which could collide with
+custom SmartThings Edge drivers fingerprinting that shared test identity.
+
+Upgrades preserve the existing Matter identity in `data/matter-storage/`, so paired
+bridges are not disrupted. The new PID applies to new installations and after an
+intentional Matter factory reset. Advanced installers can override it with
+`MATTER_PRODUCT_ID`.
+
 ## Operational limits
 
 See [SCALING.md](SCALING.md) — many Matter bridges recommend staying under ~50 bridged devices per aggregator for stable operation.

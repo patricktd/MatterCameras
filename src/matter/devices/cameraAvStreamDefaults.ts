@@ -59,6 +59,7 @@ export function cameraAvStreamDefaults(): Partial<CameraAvStreamManagement.Attri
         microphoneMaxLevel: 254,
         microphoneMinLevel: 0,
         imageRotation: 0,
+        // JPEG only — do not advertise HEIC until CaptureSnapshot can encode it (go2rtc is JPEG today).
         snapshotCapabilities: [{
             resolution: { width: 640, height: 360 },
             maxFrameRate: 1,
