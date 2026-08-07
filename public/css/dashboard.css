@@ -40,6 +40,10 @@
     --border-color: #d8e3ef;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background:
