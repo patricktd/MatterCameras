@@ -8,6 +8,15 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.2-beta] — 2026-08-07
+
+### Fixed
+
+- Update checks refresh within five minutes instead of retaining stale GitHub release data for one hour.
+- Hidden update controls no longer appear without an actionable update.
+
+---
+
 ## [0.5.1-beta] — 2026-08-07
 
 ### Added
@@ -185,7 +194,8 @@ First public beta under the **Matter Cameras Bridge** name.
 
 ---
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.1-beta...HEAD
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.2-beta...HEAD
+[0.5.2-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.1-beta...v0.5.2-beta
 [0.5.1-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.0-beta...v0.5.1-beta
 [0.5.0-beta]: https://github.com/patricktd/MatterCameras/compare/v0.4.2-beta...v0.5.0-beta
 [0.4.2-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.2-beta
