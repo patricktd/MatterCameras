@@ -1,6 +1,6 @@
 {
   "name": "matter-cameras",
-  "version": "0.5.3-beta",
+  "version": "0.5.4-beta",
   "description": "Matter-compatible bridge: RTSP/ONVIF cameras as Matter 1.5 camera endpoints for Matter hubs (not a Matter-certified product)",
   "type": "module",
   "main": "dist/main.js",

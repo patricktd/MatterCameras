@@ -64,7 +64,7 @@ else
 fi
 
 echo "==> Installing dependencies and building dist/"
-npm ci
+npm ci --include=dev
 npm run build
 
 COMPOSE_ARGS=(-f docker-compose.yml)

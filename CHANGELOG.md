@@ -8,6 +8,14 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.4-beta] — 2026-08-07
+
+### Fixed
+
+- The isolated update helper explicitly installs development build tools even though the app image runs with `NODE_ENV=production`.
+
+---
+
 ## [0.5.3-beta] — 2026-08-07
 
 ### Fixed
@@ -203,7 +211,8 @@ First public beta under the **Matter Cameras Bridge** name.
 
 ---
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.3-beta...HEAD
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.4-beta...HEAD
+[0.5.4-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.3-beta...v0.5.4-beta
 [0.5.3-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.2-beta...v0.5.3-beta
 [0.5.2-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.1-beta...v0.5.2-beta
 [0.5.1-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.0-beta...v0.5.1-beta
