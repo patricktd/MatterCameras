@@ -8,6 +8,15 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.3-beta] — 2026-08-07
+
+### Fixed
+
+- One-click updates no longer fail when Git rejects the container-mounted checkout as having dubious ownership.
+- Docker Compose now runs from an isolated helper at the checkout's real host path, preserving the existing runtime data mounts during updates.
+
+---
+
 ## [0.5.2-beta] — 2026-08-07
 
 ### Fixed
@@ -194,7 +203,8 @@ First public beta under the **Matter Cameras Bridge** name.
 
 ---
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.2-beta...HEAD
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.5.3-beta...HEAD
+[0.5.3-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.2-beta...v0.5.3-beta
 [0.5.2-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.1-beta...v0.5.2-beta
 [0.5.1-beta]: https://github.com/patricktd/MatterCameras/compare/v0.5.0-beta...v0.5.1-beta
 [0.5.0-beta]: https://github.com/patricktd/MatterCameras/compare/v0.4.2-beta...v0.5.0-beta
