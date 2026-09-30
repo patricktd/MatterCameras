@@ -92,6 +92,11 @@ export interface FabricInfo {
     vendorName?: string;
     /** Label set by the controller via UpdateFabricLabel; may be empty. */
     label: string;
+    /**
+     * Resolved display name: controller label > known ecosystem > generic.
+     * Computed server-side so the Web UI has a single source of truth.
+     */
+    displayName: string;
 }
 
 /** State of an ad-hoc commissioning window opened to pair an additional hub. */

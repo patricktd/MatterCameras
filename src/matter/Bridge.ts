@@ -53,7 +53,7 @@ import {
 } from '@matter/types';
 import { randomBytes, randomInt } from 'node:crypto';
 import type { CommissioningWindowInfo, FabricInfo, PairingInfo } from '../types/index.js';
-import { matterVendorName } from './fabricVendors.js';
+import { fabricDisplayName, matterVendorName } from './fabricVendors.js';
 
 /** Matter Aggregator (bridge) device type — must match mDNS commissioning advert. */
 const BRIDGE_DEVICE_TYPE = DeviceTypeId(0x0e);
@@ -409,14 +409,19 @@ export class MatterBridge {
     listFabrics(): FabricInfo[] {
         if (!this.server) return [];
         try {
-            return this.server.env.get(FabricManager).fabrics.map(fabric => ({
-                fabricIndex: Number(fabric.fabricIndex),
-                fabricId: fabric.fabricId.toString(),
-                nodeId: fabric.nodeId.toString(),
-                rootVendorId: Number(fabric.rootVendorId),
-                vendorName: matterVendorName(Number(fabric.rootVendorId)),
-                label: fabric.label,
-            }));
+            return this.server.env.get(FabricManager).fabrics.map(fabric => {
+                const rootVendorId = Number(fabric.rootVendorId);
+                const label = fabric.label;
+                return {
+                    fabricIndex: Number(fabric.fabricIndex),
+                    fabricId: fabric.fabricId.toString(),
+                    nodeId: fabric.nodeId.toString(),
+                    rootVendorId,
+                    vendorName: matterVendorName(rootVendorId),
+                    label,
+                    displayName: fabricDisplayName({ label, rootVendorId, fabricIndex: Number(fabric.fabricIndex) }),
+                };
+            });
         } catch (error) {
             console.warn(`Failed to list Matter fabrics: ${error}`);
             return [];

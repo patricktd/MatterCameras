@@ -301,9 +301,11 @@ function initFabricsPanel() {
     };
 
     const fabricDisplayName = (fabric) => {
+        // Server computes `displayName` (label > known ecosystem > generic).
+        if (fabric.displayName && String(fabric.displayName).trim()) return String(fabric.displayName).trim();
         if (fabric.label && fabric.label.trim()) return fabric.label.trim();
         if (fabric.vendorName) return fabric.vendorName;
-        return `Fabric ${fabric.fabricIndex}`;
+        return `Hub (vendor 0x${Number(fabric.rootVendorId).toString(16)})`;
     };
 
     const renderFabrics = (data) => {
