@@ -8,6 +8,15 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.5-beta] — 2026-09-30
+
+### Fixed
+
+- The **Connected hubs (Matter fabrics)** panel no longer falls back to a bare `Fabric N` when a controller sends no fabric label and its vendor ID is not a known ecosystem. It now shows the controller label when present, otherwise the known ecosystem name, otherwise a generic `Hub (vendor 0x…)` name that keeps the vendor ID visible across hub hardware generations.
+- Expanded the known Matter admin vendor map (Hubitat, Homey, eWeLink, Shelly, Control4, Lutron, and more) so more hubs are named correctly.
+
+---
+
 ## [0.5.4-beta] — 2026-08-07
 
 ### Fixed
