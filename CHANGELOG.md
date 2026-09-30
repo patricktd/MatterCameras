@@ -8,6 +8,15 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.6-beta] — 2026-09-30
+
+### Fixed
+
+- One-click updates no longer leave the bridge stopped after rebuilding. The helper now recreates containers with `up -d --remove-orphans` (instead of a redundant `restart app` that could race the recreate step) and verifies the app container is actually running, failing loudly with the container logs if it is not.
+- The Web UI reports a stalled update instead of waiting silently: after three minutes it shows a clear message, the host command to recover (`docker compose up -d`), and the tail of `self-update.log`, so the cause is visible without SSH.
+
+---
+
 ## [0.5.5-beta] — 2026-09-30
 
 ### Fixed

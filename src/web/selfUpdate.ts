@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { createWriteStream, existsSync } from 'fs';
+import { createWriteStream, existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 
 const DOCKER_SOCKET = '/var/run/docker.sock';
@@ -11,6 +11,29 @@ let updateInProgress = false;
 
 export function isUpdateInProgress(): boolean {
     return updateInProgress;
+}
+
+/**
+ * Tail of the self-update log, so the Web UI can show why an update stalled
+ * instead of leaving the user with a silent "waiting for restart".
+ */
+export function getSelfUpdateLogTail(maxLines = 20): string | null {
+    try {
+        if (!existsSync(UPDATE_LOG)) return null;
+        const contents = readFileSync(UPDATE_LOG, 'utf-8');
+        const lines = contents.split(/\r?\n/).filter(line => line.length > 0);
+        return lines.slice(-maxLines).join('\n');
+    } catch {
+        return null;
+    }
+}
+
+export function getSelfUpdateLogMtime(): number | null {
+    try {
+        return existsSync(UPDATE_LOG) ? statSync(UPDATE_LOG).mtimeMs : null;
+    } catch {
+        return null;
+    }
 }
 
 function resolveSelfUpdateRoot(): string {

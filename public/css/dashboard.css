@@ -384,10 +384,28 @@ a.btn-ghost:visited {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .update-banner__status {
     font-weight: 600;
+}
+
+.update-banner__actions details {
+    flex-basis: 100%;
+}
+
+.update-banner__actions pre {
+    margin: 8px 0 0;
+    max-height: 180px;
+    overflow: auto;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .code-block {

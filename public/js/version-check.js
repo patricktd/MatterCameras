@@ -76,6 +76,7 @@
 
     function pollForNewVersion(targetVersion) {
         let attempts = 0;
+        const maxAttempts = 90; // 3 minutes
         const poll = setInterval(async () => {
             attempts += 1;
             try {
@@ -89,10 +90,45 @@
             } catch (_) {
                 // Bridge restarting — keep polling.
             }
-            if (attempts >= 90) {
+            if (attempts >= maxAttempts) {
                 clearInterval(poll);
+                void reportStalledUpdate();
             }
         }, 2000);
+    }
+
+    function escapeText(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    async function reportStalledUpdate() {
+        const banner = document.getElementById(bannerId);
+        const actions = banner?.querySelector('.update-banner__actions');
+        if (!actions) return;
+
+        let detail = '';
+        try {
+            const response = await fetch('/api/updates', { cache: 'no-store' });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.updateLogTail) {
+                    detail = `<details><summary>Update log (tail)</summary><pre>${escapeText(data.updateLogTail)}</pre></details>`;
+                }
+            }
+        } catch (_) {
+            // Ignore — the guidance below still applies.
+        }
+
+        actions.innerHTML = `
+            <span class="update-banner__status">Update did not finish within 3 minutes.</span>
+            <span class="update-banner__hint">The bridge may need a manual restart with
+            <code>docker compose up -d</code> on the host.</span>
+            ${detail}
+        `;
     }
 
     async function checkUpdates() {

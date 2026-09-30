@@ -31,7 +31,7 @@ import { parseCameraMotionFields, parseMotionSource, sanitizeCameraMotionFields 
 import { setBridgeEndpointCount } from '../config/version.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from '../matter/personSensorConfig.js';
 import { getLatestReleaseInfo } from './githubRelease.js';
-import { getSelfUpdateStatus, isUpdateInProgress, spawnSelfUpdate } from './selfUpdate.js';
+import { getSelfUpdateLogMtime, getSelfUpdateLogTail, getSelfUpdateStatus, isUpdateInProgress, spawnSelfUpdate } from './selfUpdate.js';
 
 const app = express();
 const port = appConfig.webPort;
@@ -162,6 +162,8 @@ app.get('/api/updates', async (_req, res) => {
             ...release,
             canAutoUpdate,
             updateInProgress: isUpdateInProgress(),
+            updateLogTail: getSelfUpdateLogTail(),
+            updateLogMtime: getSelfUpdateLogMtime(),
         });
     } catch (error) {
         res.status(500).json({ error: String(error) });

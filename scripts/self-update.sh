@@ -69,9 +69,31 @@ npm run build
 
 COMPOSE_ARGS=(-f docker-compose.yml)
 
-echo "==> Rebuilding and restarting containers"
+echo "==> Rebuilding images"
 docker compose "${COMPOSE_ARGS[@]}" build app go2rtc
-docker compose "${COMPOSE_ARGS[@]}" up -d
-docker compose "${COMPOSE_ARGS[@]}" restart app
+
+# Recreate containers from the freshly built images. `up -d` is idempotent and
+# recreates the app/go2rtc containers; a separate `restart app` is unnecessary
+# and could race the recreate step, leaving the bridge stopped.
+echo "==> Recreating and starting containers"
+docker compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
+
+# Verify the app container actually came up. Without this, a failed start left
+# the bridge down until the user rebooted manually.
+CONTAINER_NAME="${MATTER_CAMERAS_CONTAINER_NAME:-matter_cameras}"
+echo "==> Waiting for ${CONTAINER_NAME} to start"
+for attempt in $(seq 1 30); do
+  STATE="$(docker inspect --format '{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo missing)"
+  if [[ "${STATE}" == "running" ]]; then
+    echo "==> ${CONTAINER_NAME} is running"
+    break
+  fi
+  if [[ "${attempt}" == "30" ]]; then
+    echo "ERROR: ${CONTAINER_NAME} is not running after update (state=${STATE})." >&2
+    docker compose "${COMPOSE_ARGS[@]}" logs --tail=50 app >&2 || true
+    exit 1
+  fi
+  sleep 2
+done
 
 echo "==> Self-update complete"
