@@ -81,11 +81,13 @@
             attempts += 1;
             try {
                 const response = await fetch('/api/version', { cache: 'no-store' });
-                if (!response.ok) return;
-                const payload = await response.json();
-                if (payload.version === targetVersion) {
-                    clearInterval(poll);
-                    location.reload();
+                if (response.ok) {
+                    const payload = await response.json();
+                    if (payload.version === targetVersion) {
+                        clearInterval(poll);
+                        location.reload();
+                        return;
+                    }
                 }
             } catch (_) {
                 // Bridge restarting — keep polling.

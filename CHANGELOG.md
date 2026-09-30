@@ -8,6 +8,15 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.5.7-beta] — 2026-09-30
+
+### Fixed
+
+- Self-update now **re-executes** `scripts/self-update.sh` after checking out the target tag, so the build/restart steps run the script from the new revision. Without this, fixes to the updater (including the 0.5.6 recreate/health-check changes) never applied to the update that installed them — the previous script inode kept running.
+- Post-update readiness now waits for `/api/version` to report the target version (via `wget`), not only for the Docker container state to be `running`.
+
+---
+
 ## [0.5.6-beta] — 2026-09-30
 
 ### Fixed

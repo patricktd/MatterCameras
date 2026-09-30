@@ -63,6 +63,15 @@ else
   git_safe pull --ff-only origin main
 fi
 
+# Bash keeps the originally-opened script inode open. Without a re-exec, the
+# build/restart steps below would still run the PREVIOUS revision's script —
+# so fixes to self-update.sh would never apply to the update that installs them.
+if [[ "${MATTER_CAMERAS_SELF_UPDATE_REEXEC:-0}" != "1" ]]; then
+  echo "==> Re-executing self-update.sh from checked-out revision"
+  export MATTER_CAMERAS_SELF_UPDATE_REEXEC=1
+  exec bash "${ROOT}/scripts/self-update.sh" "${TARGET}"
+fi
+
 echo "==> Installing dependencies and building dist/"
 npm ci --include=dev
 npm run build
@@ -78,18 +87,26 @@ docker compose "${COMPOSE_ARGS[@]}" build app go2rtc
 echo "==> Recreating and starting containers"
 docker compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
 
-# Verify the app container actually came up. Without this, a failed start left
-# the bridge down until the user rebooted manually.
+# Verify the app container is running AND the Web UI answers with the target
+# version. Docker "running" alone is not enough — Node may still be booting.
+# (Image has wget/node, not curl.)
 CONTAINER_NAME="${MATTER_CAMERAS_CONTAINER_NAME:-matter_cameras}"
-echo "==> Waiting for ${CONTAINER_NAME} to start"
-for attempt in $(seq 1 30); do
+WEB_PORT="${WEB_PORT:-3202}"
+EXPECTED_VERSION="${TARGET#v}"
+echo "==> Waiting for ${CONTAINER_NAME} (and /api/version) to come up"
+for attempt in $(seq 1 60); do
   STATE="$(docker inspect --format '{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo missing)"
   if [[ "${STATE}" == "running" ]]; then
-    echo "==> ${CONTAINER_NAME} is running"
-    break
+    LIVE_VERSION="$(wget -qO- --timeout=2 "http://127.0.0.1:${WEB_PORT}/api/version" 2>/dev/null \
+      | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' || true)"
+    if [[ -z "${EXPECTED_VERSION}" || "${LIVE_VERSION}" == "${EXPECTED_VERSION}" ]]; then
+      echo "==> ${CONTAINER_NAME} is running (version=${LIVE_VERSION:-unknown})"
+      break
+    fi
+    echo "    … running but version is '${LIVE_VERSION:-unknown}' (want '${EXPECTED_VERSION}')"
   fi
-  if [[ "${attempt}" == "30" ]]; then
-    echo "ERROR: ${CONTAINER_NAME} is not running after update (state=${STATE})." >&2
+  if [[ "${attempt}" == "60" ]]; then
+    echo "ERROR: ${CONTAINER_NAME} did not become ready after update (state=${STATE}, version=${LIVE_VERSION:-unknown})." >&2
     docker compose "${COMPOSE_ARGS[@]}" logs --tail=50 app >&2 || true
     exit 1
   fi
