@@ -33,7 +33,7 @@ Estimates for a dedicated server (e.g. NUC / mini PC on the same LAN as the came
 
 - Document **minimum hardware requirements** in the README.
 - Recommend **native H.264** on RTSP when possible (eliminates ffmpeg).
-- Limit or warn when adding more than **4 cameras** in the Web UI (some hub apps cap card previews).
+- Limit or warn when adding more than **4 cameras** in the Web UI (some hub apps cap card previews and the multi-view grid at 4 — app-side limits, not bridge/Matter).
 - Use a **standalone Matter hub** with Matter 1.5 camera firmware (e.g. Aeotec / SmartThings — not a TV-embedded hub).
 - Keep the bridge and cameras on the **same subnet**; WebRTC uses UDP **8555** on the host.
 

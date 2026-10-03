@@ -32,6 +32,7 @@ import { setBridgeEndpointCount } from '../config/version.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from '../matter/personSensorConfig.js';
 import { getLatestReleaseInfo } from './githubRelease.js';
 import { getSelfUpdateLogMtime, getSelfUpdateLogTail, getSelfUpdateStatus, isUpdateInProgress, spawnSelfUpdate } from './selfUpdate.js';
+import { reportMetrics } from '../matter/reportMetrics.js';
 
 const app = express();
 const port = appConfig.webPort;
@@ -386,6 +387,14 @@ app.get('/api/diagnostics/bridge', (_req, res) => {
         matterEndpoints: endpoints,
         orphanMatterEndpoints: bridge.listOrphanBridgedCameraIds(expected),
     });
+});
+
+/**
+ * Matter interaction traffic emitted by this bridge over a sliding window.
+ * Diagnostics only — used to confirm/refute external "event storm" claims with real numbers.
+ */
+app.get('/api/diagnostics/reports', (_req, res) => {
+    res.json(reportMetrics.snapshot());
 });
 
 /** Camera add plugins (UniFi Protect, Reolink, ONVIF, manual). */

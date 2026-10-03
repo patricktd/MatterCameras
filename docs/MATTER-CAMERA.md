@@ -137,7 +137,7 @@ curl -s -X POST http://<host>:3202/api/onvif/resolve \
 
 ## Cloud recording plan (why it does not record)
 
-Some hubs (e.g. SmartThings) offer a subscription plan to select up to **4 cameras** for cloud recording. The UI may appear because the device type is **Matter Camera**, but clips are uploaded via a different path than live view:
+Some hubs (e.g. SmartThings) offer a subscription plan to select up to **4 cameras** for cloud recording. This "4" is one of **two separate hub-app limits** (the other is the app's multi-view grid, also 4) — both are **app/plan UI limits**, not bridge or Matter limits. The UI may appear because the device type is **Matter Camera**, but clips are uploaded via a different path than live view:
 
 ### Matter path for recording
 

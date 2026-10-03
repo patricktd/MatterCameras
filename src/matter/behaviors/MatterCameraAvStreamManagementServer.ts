@@ -6,6 +6,7 @@ import { normalizeJpeg, readJpegDimensions } from '../../streaming/normalizeJpeg
 import { imageTransformFromMatterState } from '../../streaming/imageTransform.js';
 import { streamContext } from './streamContext.js';
 import { logHubEndpointAdoption } from '../hubAdoptionLog.js';
+import { reportMetrics } from '../reportMetrics.js';
 import {
     createDefaultAudioStream,
     createDefaultSnapshotStream,
@@ -49,6 +50,7 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
 
         const cameraId = String(this.endpoint.id);
         const transform = imageTransformFromMatterState(this.state);
+        reportMetrics.record(cameraId, 'cameraAvStreamManagement', 'imageTransform');
         void go2rtc.setImageTransform(cameraId, transform).catch(error => {
             logger.warn(`ImageControl go2rtc refresh failed camera=${cameraId}: ${error}`);
         });
@@ -57,6 +59,7 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
     override async setStreamPriorities(request: CameraAvStreamManagement.SetStreamPrioritiesRequest) {
         if (request.streamPriorities?.length) {
             const allowed = request.streamPriorities.filter(usage => usage === StreamUsage.LiveView);
+            reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'streamUsagePriorities');
             this.state.streamUsagePriorities = allowed.length ? allowed : [StreamUsage.LiveView];
         }
     }
@@ -84,12 +87,14 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         stream.sampleRate = request.sampleRate ?? stream.sampleRate;
         stream.bitRate = request.bitRate ?? stream.bitRate;
         streams.push(stream);
+        reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'allocatedAudioStreams');
         this.state.allocatedAudioStreams = streams;
 
         return new AvMgmt.AudioStreamAllocateResponse({ audioStreamId: stream.audioStreamId });
     }
 
     override async audioStreamDeallocate(request: CameraAvStreamManagement.AudioStreamDeallocateRequest) {
+        reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'allocatedAudioStreams');
         this.state.allocatedAudioStreams = (this.state.allocatedAudioStreams ?? []).filter(
             s => s.audioStreamId !== request.audioStreamId,
         );
@@ -108,11 +113,13 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         const stream = createDefaultVideoStream(usage);
         stream.videoStreamId = 1;
         streams.push(stream);
+        reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'allocatedVideoStreams');
         this.state.allocatedVideoStreams = streams;
         return new AvMgmt.VideoStreamAllocateResponse({ videoStreamId: stream.videoStreamId });
     }
 
     override async videoStreamDeallocate(request: CameraAvStreamManagement.VideoStreamDeallocateRequest) {
+        reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'allocatedVideoStreams');
         this.state.allocatedVideoStreams = (this.state.allocatedVideoStreams ?? []).filter(
             s => s.videoStreamId !== request.videoStreamId,
         );
@@ -138,12 +145,14 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         stream.frameRate = request.maxFrameRate ?? stream.frameRate;
         stream.minResolution = request.minResolution ?? stream.minResolution;
         stream.maxResolution = request.maxResolution ?? stream.maxResolution;
+        reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'allocatedSnapshotStreams');
         this.state.allocatedSnapshotStreams = [stream];
 
         return new AvMgmt.SnapshotStreamAllocateResponse({ snapshotStreamId: stream.snapshotStreamId });
     }
 
     override async snapshotStreamDeallocate(request: CameraAvStreamManagement.SnapshotStreamDeallocateRequest) {
+        reportMetrics.record(String(this.endpoint.id), 'cameraAvStreamManagement', 'allocatedSnapshotStreams');
         this.state.allocatedSnapshotStreams = (this.state.allocatedSnapshotStreams ?? []).filter(
             s => s.snapshotStreamId !== request.snapshotStreamId,
         );

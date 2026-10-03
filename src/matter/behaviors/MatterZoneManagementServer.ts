@@ -7,6 +7,7 @@ import { streamContext } from './streamContext.js';
 import { DEFAULT_MOTION_ZONE_ID } from '../devices/zoneManagementDefaults.js';
 import { OccupancySensing } from '@matter/types/clusters/occupancy-sensing';
 import { MatterOccupancySensingServer } from './MatterOccupancySensingServer.js';
+import { reportMetrics } from '../reportMetrics.js';
 
 const Zm = ZoneManagement;
 const logger = Logger.get('ZoneManagement');
@@ -218,6 +219,7 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
         logger.info(msg);
         console.log(msg);
         this.#setOccupancy(true);
+        reportMetrics.record(String(this.endpoint.id), 'zoneManagement', 'zoneTriggered');
         this.events.zoneTriggered.emit(
             new Zm.ZoneTriggeredEvent({
                 zone: zoneId,
@@ -238,6 +240,7 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
         rt.blindUntil = Date.now() + rt.control.blindDuration * 1_000;
         this.#clearTimers(rt);
 
+        reportMetrics.record(String(this.endpoint.id), 'zoneManagement', 'zoneStopped');
         this.events.zoneStopped.emit(
             new Zm.ZoneStoppedEvent({ zone: zoneId, reason }),
             this.context,
@@ -258,6 +261,7 @@ export class MatterZoneManagementServer extends ZoneMgmtServer {
     #setOccupancy(occupied: boolean): void {
         const msg = `Occupancy camera=${this.endpoint.id} occupied=${occupied}`;
         logger.info(msg);
+        reportMetrics.record(String(this.endpoint.id), 'occupancySensing', 'occupancy');
         void this.endpoint.setStateOf(MatterOccupancySensingServer, {
             occupancy: new OccupancySensing.Occupancy({ occupied }),
         }).catch(() => undefined);

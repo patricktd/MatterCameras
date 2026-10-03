@@ -4,7 +4,15 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
-## [Unreleased]
+## [0.5.8-beta] — 2026-10-03
+
+### Added
+
+- `GET /api/diagnostics/reports` reports the Matter interaction traffic the bridge emits over a sliding 30-second window (attribute/event writes per endpoint, cluster and attribute, plus subscription changes), so operators can verify hub-side "event storm" claims with real numbers.
+
+### Changed
+
+- Documentation now names the **two separate 4-camera SmartThings app limits** explicitly — the mobile app's multi-view grid and Home Monitor's cloud monitoring card previews — as app/plan limits, not bridge or Matter limits. Affects the Web UI banner (shown when more than 4 cameras are bridged), `docs/INSTALL.md`, `docs/MATTER-CAMERA.md`, and `docs/SCALING.md`.
 
 ---
 

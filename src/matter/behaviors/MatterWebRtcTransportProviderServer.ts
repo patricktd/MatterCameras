@@ -24,6 +24,7 @@ import {
 import { appConfig } from '../../config/app.js';
 import { buildSolicitOfferResponse } from './solicitOfferHandler.js';
 import { logHubEndpointAdoption } from '../hubAdoptionLog.js';
+import { reportMetrics } from '../reportMetrics.js';
 
 const logger = Logger.get('MatterWebRtc');
 
@@ -208,6 +209,7 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
 
         try {
             const others = (this.state.currentSessions ?? []).filter(s => s.id !== sessionId);
+            reportMetrics.record(cameraId, 'webRtcTransportProvider', 'currentSessions');
             this.state.currentSessions = [...others, new WebRtcTransportDefinitions.WebRtcSession(sessionFields)];
         } catch (error) {
             logger.warn(`Failed to update currentSessions: ${error}`);
@@ -309,6 +311,9 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         }
 
         this.#sessions.delete(sessionId);
+        if (session) {
+            reportMetrics.record(session.cameraId, 'webRtcTransportProvider', 'currentSessions');
+        }
         this.state.currentSessions = (this.state.currentSessions ?? []).filter(s => s.id !== sessionId);
     }
 

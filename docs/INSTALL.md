@@ -147,7 +147,12 @@ If ONVIF is on a non-standard port, set **ONVIF device URL** under Advanced afte
 
 ### More than 4 cameras (hub app limits)
 
-Live view works for all bridged cameras on the bridge. Some hub apps (including **SmartThings**) only let you pick **4 cameras** for cloud monitoring **card previews** — cameras outside that selection may show empty cards. On SmartThings, change the selection in **Home Monitor → Cameras**.
+Live view works for all bridged cameras on the bridge. Some hub apps (including **SmartThings**) apply their own **4-camera** cap in two separate places:
+
+- **App multi-view grid** — the mobile app's multi-view shows up to **4** feeds at once (SmartThings TV shows one). This is an app UI limit.
+- **Cloud monitoring card previews** — Home Monitor lets you pick up to **4 cameras** for card previews; cameras outside that selection may show empty cards. On SmartThings, change the selection in **Home Monitor → Cameras**.
+
+Neither limit is imposed by the bridge or by Matter (SmartThings supports far more devices per location). All cameras remain available for live view and automations.
 
 ### No camera yet?
 

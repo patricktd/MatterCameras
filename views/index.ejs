@@ -15,10 +15,12 @@
 
         <% if (cameras.length > 4) { %>
             <div class="notice-banner notice-banner--warning main-grid-full">
-                <strong>Hub preview limit:</strong> some hub apps (e.g. SmartThings) let you pick up to
-                <strong>4 cameras</strong> for cloud monitoring card previews. Live view works for all
-                <%= cameras.length %> cameras; cameras outside your selection may show a stale or empty card.
-                On SmartThings, change the selection in <strong>Home Monitor → Cameras</strong>.
+                <strong>Hub app limits:</strong> some hub apps (e.g. SmartThings) cap camera UI at
+                <strong>4 cameras</strong> in two places — the app's multi-view grid, and Home Monitor's
+                cloud monitoring card previews. Live view works for all
+                <%= cameras.length %> cameras; cameras outside the card selection may show a stale or empty card.
+                On SmartThings, change the card selection in <strong>Home Monitor → Cameras</strong> (the multi-view
+                grid is a separate app limit). These are hub app limits, not bridge or Matter limits.
             </div>
         <% } %>
 

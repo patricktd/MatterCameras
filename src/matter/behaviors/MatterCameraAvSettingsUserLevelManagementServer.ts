@@ -2,6 +2,7 @@ import { Logger } from '@matter/general';
 import { CameraAvSettingsUserLevelManagement } from '@matter/types/clusters/camera-av-settings-user-level-management';
 import { CameraAvSettingsUserLevelManagementServer as BaseCameraAvSettingsUserLevelManagementServer } from '@matter/node/behaviors/camera-av-settings-user-level-management';
 import { ptzContext } from './ptzContext.js';
+import { reportMetrics } from '../reportMetrics.js';
 import {
     DEFAULT_MPTZ,
     mergeSetPositionHub,
@@ -45,6 +46,7 @@ export class MatterCameraAvSettingsUserLevelManagementServer
         }
 
         this.state.movementState = AvSettings.PhysicalMovement.Moving;
+        reportMetrics.record(cameraId, 'cameraAvSettingsUserLevelManagement', 'movementState');
         try {
             const ok = await handler(target);
             if (ok) {
@@ -56,6 +58,7 @@ export class MatterCameraAvSettingsUserLevelManagementServer
             }
         } finally {
             this.state.movementState = AvSettings.PhysicalMovement.Idle;
+            reportMetrics.record(cameraId, 'cameraAvSettingsUserLevelManagement', 'movementState');
         }
     }
 
@@ -78,6 +81,7 @@ export class MatterCameraAvSettingsUserLevelManagementServer
         }
 
         this.state.movementState = AvSettings.PhysicalMovement.Moving;
+        reportMetrics.record(cameraId, 'cameraAvSettingsUserLevelManagement', 'movementState');
         try {
             const ok = await handler({
                 panDelta: request.panDelta ?? 0,
@@ -91,6 +95,7 @@ export class MatterCameraAvSettingsUserLevelManagementServer
             }
         } finally {
             this.state.movementState = AvSettings.PhysicalMovement.Idle;
+            reportMetrics.record(cameraId, 'cameraAvSettingsUserLevelManagement', 'movementState');
         }
     }
 }

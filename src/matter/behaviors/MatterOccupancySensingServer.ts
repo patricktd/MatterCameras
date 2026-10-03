@@ -1,6 +1,7 @@
 import { CameraRequirements } from '@matter/main/devices/camera';
 import { Logger } from '@matter/general';
 import { OccupancySensing } from '@matter/types/clusters/occupancy-sensing';
+import { reportMetrics } from '../reportMetrics.js';
 
 const Os = OccupancySensing;
 const logger = Logger.get('OccupancySensing');
@@ -16,6 +17,7 @@ export class MatterOccupancySensingServer extends OccServer {
     static override readonly id = 'occupancySensing';
 
     setOccupied(occupied: boolean): void {
+        reportMetrics.record(String(this.endpoint.id), 'occupancySensing', 'occupancy');
         this.state.occupancy = new Os.Occupancy({ occupied });
         logger.info(`Occupancy camera=${this.endpoint.id} occupied=${occupied}`);
     }

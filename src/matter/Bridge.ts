@@ -35,6 +35,7 @@ import {
     shouldExposeReolinkLight,
 } from './reolinkLightConfig.js';
 import { shouldExposePtz } from './ptzConfig.js';
+import { reportMetrics } from './reportMetrics.js';
 import { OccupancySensing } from '@matter/types/clusters/occupancy-sensing';
 import { OccupancySensingServer } from '@matter/node/behaviors/occupancy-sensing';
 import { OnOffServer } from '@matter/node/behaviors/on-off';
@@ -73,6 +74,7 @@ export class MatterBridge {
     private started = false;
     #adHocWindow?: { pairing: PairingInfo; expiresAt: number; timer: NodeJS.Timeout };
     #lastIntentionalFabricRemovalAt = 0;
+    #subscriptionObserverAttached = false;
     readonly go2rtc: Go2RTCClient;
     readonly motionDetection = new MotionDetectionService();
     readonly reolinkLight = new ReolinkLightService();
@@ -141,8 +143,24 @@ export class MatterBridge {
         await this.server.start();
         await this.#purgeLegacyPlaceholderEndpoints();
         this.started = true;
+        this.#attachSubscriptionObserver();
         await this.#announceStructureToHub();
         console.log(`Matter Bridge online at ${appConfig.matterHost}:${appConfig.matterPort}`);
+    }
+
+    /**
+     * Diagnostics only: count subscription set changes so operators can distinguish hub resubscription
+     * churn from legitimate attribute reports. Never affects bridge behavior.
+     */
+    #attachSubscriptionObserver(): void {
+        if (!this.server || this.#subscriptionObserverAttached) return;
+        try {
+            const sessions = this.server.env.get(SessionManager);
+            sessions.subscriptionsChanged.on(() => reportMetrics.recordSubscriptionChanged());
+            this.#subscriptionObserverAttached = true;
+        } catch (error) {
+            console.warn(`Subscription diagnostics observer not attached: ${error}`);
+        }
     }
 
     /** Bump softwareVersion/configurationVersion + re-report PartsList so hubs re-discover bridged cameras. */
@@ -181,6 +199,7 @@ export class MatterBridge {
                                 if (bridged.state.configurationVersion === undefined) {
                                     bridged.state.configurationVersion = 1;
                                 }
+                                reportMetrics.record(String(endpoint.id), 'bridgedDeviceBasicInformation', 'configurationVersion');
                                 await bridged.increaseConfigurationVersion(undefined, context);
                             });
                         } catch (error) {
@@ -778,6 +797,7 @@ export class MatterBridge {
 
         this.motionDetection.startCamera(personMotionCamera, this.go2rtc, {
             onActive: active => {
+                reportMetrics.record(String(endpoint.id), 'occupancySensing', 'occupancy');
                 void endpoint.setStateOf(OccupancySensingServer, {
                     occupancy: new OccupancySensing.Occupancy({ occupied: active }),
                 });
@@ -823,6 +843,8 @@ export class MatterBridge {
     async #startReolinkLight(camera: Camera, endpoint: Endpoint): Promise<void> {
         this.reolinkLight.stop(camera.id);
         const started = await this.reolinkLight.start(camera, endpoint, state => {
+            reportMetrics.record(String(endpoint.id), 'onOff', 'onOff');
+            reportMetrics.record(String(endpoint.id), 'levelControl', 'currentLevel');
             void endpoint.setStateOf(OnOffServer, { onOff: state.on });
             void endpoint.setStateOf(LevelControlServer, { currentLevel: state.level });
         });
